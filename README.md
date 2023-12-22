@@ -1,3 +1,5 @@
-# Google PaLM
+# Google Gemini
 
-Use the Google PaLM 2 API in Raycast.
+Use the Google Gemini Pro API in Raycast.
+
+https://ai.google.dev
