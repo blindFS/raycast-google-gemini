@@ -34,6 +34,15 @@ async function pathToGenerativePart(path, mimeType) {
   };
 }
 
+async function arrayBufferToGenerativePart(arrayBuffer, mimeType) {
+  return {
+    inlineData: {
+      data: Buffer.from(arrayBuffer).toString("base64"),
+      mimeType
+    },
+  };
+}
+
 export default (props, context, examples, vision = false) => {
   const { query: argQuery } = props.arguments;
   const { apiKey } = getPreferenceValues();
@@ -60,22 +69,25 @@ export default (props, context, examples, vision = false) => {
         // read image from clipboard
         const { text, file, html } = await Clipboard.read();
         var fileUrl = file;
-        var path;
-        var mime = 'image/png';
+        var imageParts = [];
         if (fileUrl) {
-          path = url.fileURLToPath(fileUrl);
+          const path = url.fileURLToPath(fileUrl);
+          const mime = 'image/png';
+          imageParts = [
+            await pathToGenerativePart(path, mime),
+          ];
         } else {
           const parsedUrl = url.parse(text);
           if (parsedUrl.protocol) {
             // download image from parsedUrl.href to IMAGE_PATH
-            path = resolve(environment.supportPath, "image");
             fileUrl = parsedUrl.href
             const response = await fetch(fileUrl);
             const arrayBuffer = await response.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
             const fileType = await fileTypeFromBuffer(arrayBuffer);
-            mime = await fileType.mime;
-            fs.writeFileSync(path, buffer);
+            const mime = await fileType.mime;
+            imageParts = [
+              await arrayBufferToGenerativePart(arrayBuffer, mime),
+            ];
           } else {
             setMarkdown("Please copy an image or a link to an image.");
             return;
@@ -84,10 +96,6 @@ export default (props, context, examples, vision = false) => {
         extraText = `User prompt: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n Gemini response: \n\n`;
         console.log(fileUrl);
         setMarkdown(extraText + 'generating answer...');
-        console.log(path)
-        const imageParts = [
-          await pathToGenerativePart(path, mime),
-        ];
         result = await model.generateContent([query, ...imageParts]);
       } else {
         const model = genAI.getGenerativeModel({ model: "gemini-pro"});
