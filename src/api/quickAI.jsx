@@ -5,13 +5,13 @@ import { useState, useEffect } from "react";
 import { getPreferenceValues } from "@raycast/api";
 import { Clipboard } from "@raycast/api";
 import { resolve } from "path";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { execSync } from "child_process";
+import { fileTypeFromBuffer } from "file-type";
 import fetch from 'node-fetch';
+import fs from "fs";
+import url from "url";
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { execSync } = require('child_process');
-const fs = require('fs');
-const url = require('url');
-const { fileTypeFromBuffer } = require('file-type');
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 
 function executeShellCommand(command) {
