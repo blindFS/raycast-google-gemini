@@ -1,10 +1,13 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "raycast-google-palm",
-  "title": "Google PaLM",
-  "description": "Use the Google PaLM 2 API in Raycast.",
+  "name": "raycast-google-gemini",
+  "title": "Google Gemini",
+  "description": "Use the Google Gemini API in Raycast.",
   "icon": "command-icon.png",
   "author": "EvanZhouDev",
+  "contributors": [
+    "blindfs"
+  ],
   "categories": [
     "Productivity",
     "Developer Tools"
@@ -14,8 +17,8 @@
     {
       "name": "ask-ai",
       "title": "Ask AI",
-      "subtitle": "Google PaLM",
-      "description": "Ask Google PaLM",
+      "subtitle": "Google Gemini",
+      "description": "Ask Google Gemini",
       "mode": "view",
       "arguments": [
         {
@@ -29,7 +32,7 @@
     {
       "name": "summarize",
       "title": "Summarize",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Summarize selected text",
       "mode": "view",
       "arguments": [
@@ -44,7 +47,7 @@
     {
       "name": "explain",
       "title": "Explain",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Explain selected text",
       "mode": "view",
       "arguments": [
@@ -59,7 +62,7 @@
     {
       "name": "comment",
       "title": "Add Comments to Code",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Add comments to code",
       "mode": "view",
       "arguments": [
@@ -74,7 +77,7 @@
     {
       "name": "friendly",
       "title": "Change Tone to Friendly",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Change tone of selected text to friendly",
       "mode": "view",
       "arguments": [
@@ -89,7 +92,7 @@
     {
       "name": "professional",
       "title": "Change Tone to Professional",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Change tone of selected text to professional",
       "mode": "view",
       "arguments": [
@@ -104,8 +107,23 @@
     {
       "name": "synonym",
       "title": "Find Synonym",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Find synonym of selected word",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "query",
+          "placeholder": "Query",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "image-qa",
+      "title": "Image QA",
+      "subtitle": "Google Gemini",
+      "description": "Answer question in text, given the png image from clipboard",
       "mode": "view",
       "arguments": [
         {
@@ -119,7 +137,7 @@
     {
       "name": "grammar",
       "title": "Fix Spelling and Grammar",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Fix spelling and grammar of selected text",
       "mode": "view",
       "arguments": [
@@ -134,7 +152,7 @@
     {
       "name": "longer",
       "title": "Make Longer",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Make selected text longer",
       "mode": "view",
       "arguments": [
@@ -149,7 +167,7 @@
     {
       "name": "shorter",
       "title": "Make Shorter",
-      "subtitle": "Google PaLM",
+      "subtitle": "Google Gemini",
       "description": "Make selected text shorter",
       "mode": "view",
       "arguments": [
@@ -164,10 +182,10 @@
   ],
   "preferences": [
     {
-      "description": "PaLM API Key",
+      "description": "Gemini API Key",
       "name": "apiKey",
       "required": true,
-      "title": "PaLM API Key",
+      "title": "Gemini API Key",
       "type": "password"
     }
   ],
@@ -175,7 +193,8 @@
     "@raycast/api": "^1.56.0",
     "@raycast/utils": "^1.9.0",
     "node-fetch": "^3.3.2",
-    "palm-api": "^1.0.4"
+    "@google/generative-ai": "^0.1.3",
+    "file-type": "^18.7.0"
   },
   "devDependencies": {
     "@raycast/eslint-config": "1.0.5",
