@@ -8,7 +8,7 @@ import { resolve } from "path";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { execSync } from "child_process";
 import { fileTypeFromBuffer } from "file-type";
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
 import fs from "fs";
 import url from "url";
 
@@ -16,11 +16,11 @@ const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 
 function executeShellCommand(command) {
   try {
-    const result = execSync(command, { encoding: 'utf-8' });
+    const result = execSync(command, { encoding: "utf-8" });
     return result.trim();
   } catch (error) {
     console.error(`Error executing shell command: ${error}`);
-    return '';
+    return "";
   }
 }
 
@@ -29,7 +29,7 @@ async function pathToGenerativePart(path, mimeType) {
   return {
     inlineData: {
       data: Buffer.from(fs.readFileSync(path)).toString("base64"),
-      mimeType
+      mimeType,
     },
   };
 }
@@ -38,7 +38,7 @@ async function arrayBufferToGenerativePart(arrayBuffer, mimeType) {
   return {
     inlineData: {
       data: Buffer.from(arrayBuffer).toString("base64"),
-      mimeType
+      mimeType,
     },
   };
 }
@@ -52,7 +52,7 @@ export default (props, context, examples, vision = false) => {
 
   const getResponse = async (query, enable_vision = false) => {
     var extraText = `User prompt: \n\n\`\`\`\n${query}\n\`\`\` \n\n Gemini response: \n\n`;
-    setMarkdown(extraText + '...');
+    setMarkdown(extraText + "...");
 
     await showToast({
       style: Toast.Style.Animated,
@@ -61,33 +61,36 @@ export default (props, context, examples, vision = false) => {
 
     const start = Date.now();
     const genAI = new GoogleGenerativeAI(apiKey);
+    const generationConfig = {
+      stopSequences: ["red"],
+      maxOutputTokens: 5000,
+      temperature: 0.1,
+      topP: 0.1,
+      topK: 5,
+    };
 
     try {
       var result;
       if (enable_vision) {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro-vision"});
+        const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" }, generationConfig);
         // read image from clipboard
         const { text, file, html } = await Clipboard.read();
         var fileUrl = file;
         var imageParts = [];
         if (fileUrl) {
           const path = url.fileURLToPath(fileUrl);
-          const mime = 'image/png';
-          imageParts = [
-            await pathToGenerativePart(path, mime),
-          ];
+          const mime = "image/png";
+          imageParts = [await pathToGenerativePart(path, mime)];
         } else {
           const parsedUrl = url.parse(text);
           if (parsedUrl.protocol) {
             // download image from parsedUrl.href to IMAGE_PATH
-            fileUrl = parsedUrl.href
+            fileUrl = parsedUrl.href;
             const response = await fetch(fileUrl);
             const arrayBuffer = await response.arrayBuffer();
             const fileType = await fileTypeFromBuffer(arrayBuffer);
             const mime = await fileType.mime;
-            imageParts = [
-              await arrayBufferToGenerativePart(arrayBuffer, mime),
-            ];
+            imageParts = [await arrayBufferToGenerativePart(arrayBuffer, mime)];
           } else {
             setMarkdown("Please copy an image or a link to an image.");
             return;
@@ -95,19 +98,19 @@ export default (props, context, examples, vision = false) => {
         }
         extraText = `User prompt: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n Gemini response: \n\n`;
         console.log(fileUrl);
-        setMarkdown(extraText + 'generating answer...');
+        setMarkdown(extraText + "generating answer...");
         result = await model.generateContent([query, ...imageParts]);
       } else {
-        const model = genAI.getGenerativeModel({ model: "gemini-pro"});
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" }, generationConfig);
         result = await model.generateContent(query);
       }
       const response = await result.response;
       const text = response.text();
       setRawAnswer(text);
       fs.writeFileSync(DOWNLOAD_PATH, extraText + text);
-      console.log('Response saved to ' + DOWNLOAD_PATH);
+      console.log("Response saved to " + DOWNLOAD_PATH);
       // get full path of the parent directory of current script
-      const scriptPath = resolve(__dirname, 'assets', 'mathEquation.js')
+      const scriptPath = resolve(__dirname, "assets", "mathEquation.js");
       let commandString = `node ${scriptPath} "${DOWNLOAD_PATH}"`;
       let markdown = executeShellCommand(commandString);
       setMarkdown(markdown);
@@ -159,12 +162,16 @@ export default (props, context, examples, vision = false) => {
   }, []);
 
   useEffect(() => {
-    setDOM(<Detail markdown={markdown}
-      actions={
-      <ActionPanel>
-        <Action.CopyToClipboard content={rawAnswer} shortcut={{ modifiers: ["cmd"], key: "." }} />
-      </ActionPanel>
-    }></Detail>);
+    setDOM(
+      <Detail
+        markdown={markdown}
+        actions={
+          <ActionPanel>
+            <Action.CopyToClipboard content={rawAnswer} shortcut={{ modifiers: ["cmd"], key: "." }} />
+          </ActionPanel>
+        }
+      ></Detail>
+    );
   }, [markdown]);
 
   return DOM;
