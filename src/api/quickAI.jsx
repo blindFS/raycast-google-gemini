@@ -44,7 +44,7 @@ async function arrayBufferToGenerativePart(arrayBuffer, mimeType) {
   };
 }
 
-export default (props, context, examples, vision = false) => {
+export default (props, context, vision = false) => {
   const { query: argQuery } = props.arguments;
   const { apiKey } = getPreferenceValues();
   const { push, pop } = useNavigation();
@@ -91,6 +91,9 @@ export default (props, context, examples, vision = false) => {
           var fileUrl = file;
           var imageParts = [];
           if (fileUrl) {
+            const imageTempalte = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+            historyText = markdown + imageTempalte;
+            setMarkdown(historyText + "...");
             const path = url.fileURLToPath(fileUrl);
             const mime = "image/png";
             imageParts = [await pathToGenerativePart(path, mime)];
@@ -99,6 +102,9 @@ export default (props, context, examples, vision = false) => {
             if (parsedUrl.protocol) {
               // download image from parsedUrl.href to IMAGE_PATH
               fileUrl = parsedUrl.href;
+              const imageTempalte = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+              historyText = markdown + imageTempalte;
+              setMarkdown(historyText + "...");
               const response = await fetch(fileUrl);
               const arrayBuffer = await response.arrayBuffer();
               const fileType = await fileTypeFromBuffer(arrayBuffer);
@@ -115,10 +121,7 @@ export default (props, context, examples, vision = false) => {
               return;
             }
           }
-          const imageTempalte = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
-          historyText = markdown + imageTempalte;
           console.log(fileUrl);
-          setMarkdown(historyText + "...");
           const chat = model.startChat({
             history: [],
             generationConfig: generationConfig,
@@ -161,10 +164,10 @@ export default (props, context, examples, vision = false) => {
       });
     } catch (e) {
       console.error(e);
-      setMarkdown(e.message);
       await showToast({
         style: Toast.Style.Failure,
         title: "Response Failed",
+        message: e.message,
       });
     }
   };
