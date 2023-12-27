@@ -1,5 +1,5 @@
 const fs = require("fs");
-var mjAPI = require("/usr/local/lib/node_modules/mathjax-node");
+var mjAPI = require("mathjax-node");
 
 mjAPI.config({
   MathJax: {

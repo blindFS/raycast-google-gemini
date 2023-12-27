@@ -187,6 +187,13 @@
       "required": true,
       "title": "Gemini API Key",
       "type": "password"
+    },
+    {
+      "description": "Whether use streamed IO or not",
+      "name": "streamedIO",
+      "required": false,
+      "title": "Streamed IO",
+      "type": "checkbox"
     }
   ],
   "dependencies": {

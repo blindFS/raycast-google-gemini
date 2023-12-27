@@ -14,6 +14,18 @@ import fetch from "node-fetch";
 
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 globalThis.fetch = fetch;
+const safetySettings = [];
+for (const category of Object.keys(HarmCategory)) {
+  if (category != HarmCategory.HARM_CATEGORY_UNSPECIFIED) {
+    safetySettings.push({ category: category, threshold: HarmBlockThreshold.BLOCK_NONE });
+  }
+}
+const generationConfig = {
+  maxOutputTokens: 50000,
+  temperature: 0.0,
+  topP: 0.01,
+  topK: 1,
+};
 
 function executeShellCommand(command) {
   try {
@@ -46,29 +58,15 @@ async function arrayBufferToGenerativePart(arrayBuffer, mimeType) {
 
 export default (props, context, vision = false) => {
   const { query: argQuery } = props.arguments;
-  const { apiKey } = getPreferenceValues();
+  const { apiKey, streamedIO } = getPreferenceValues();
   const { push, pop } = useNavigation();
   const [markdown, setMarkdown] = useState("");
   const [rawAnswer, setRawAnswer] = useState("");
   const [DOM, setDOM] = useState(<Detail markdown={markdown}></Detail>);
   const [chatObject, setChatObject] = useState(null);
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const safetySettings = [];
-  for (const category of Object.keys(HarmCategory)) {
-    if (category != HarmCategory.HARM_CATEGORY_UNSPECIFIED) {
-      safetySettings.push({ category: category, threshold: HarmBlockThreshold.BLOCK_NONE });
-    }
-  }
-  const generationConfig = {
-    stopSequences: ["red"],
-    maxOutputTokens: 50000,
-    temperature: 0.0,
-    topP: 0.01,
-    topK: 1,
-  };
-
   const getResponse = async (query, enable_vision = false) => {
+    const genAI = new GoogleGenerativeAI(apiKey);
     const textTemplate = `\n\n👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
 
@@ -87,23 +85,23 @@ export default (props, context, vision = false) => {
         if (enable_vision) {
           const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" }, safetySettings, generationConfig);
           // read image from clipboard
-          const { text, file, html } = await Clipboard.read();
+          const { text, file } = await Clipboard.read();
           var fileUrl = file;
           var imageParts = [];
           if (fileUrl) {
-            const imageTempalte = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
-            historyText = markdown + imageTempalte;
+            const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+            historyText = markdown + imageTemplate;
             setMarkdown(historyText + "...");
             const path = url.fileURLToPath(fileUrl);
             const mime = "image/png";
             imageParts = [await pathToGenerativePart(path, mime)];
           } else {
-            const parsedUrl = url.parse(text);
+            const parsedUrl = new URL(text);
             if (parsedUrl.protocol) {
               // download image from parsedUrl.href to IMAGE_PATH
               fileUrl = parsedUrl.href;
-              const imageTempalte = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
-              historyText = markdown + imageTempalte;
+              const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+              historyText = markdown + imageTemplate;
               setMarkdown(historyText + "...");
               const response = await fetch(fileUrl);
               const arrayBuffer = await response.arrayBuffer();
@@ -128,7 +126,11 @@ export default (props, context, vision = false) => {
             safetySettings: safetySettings,
           });
           setChatObject(chat);
-          result = await chat.sendMessageStream([query, ...imageParts]);
+          if (streamedIO) {
+            result = await chat.sendMessageStream([query, ...imageParts]);
+          } else {
+            result = await chat.sendMessage([query, ...imageParts]);
+          }
         } else {
           setMarkdown(historyText + "...");
           const model = genAI.getGenerativeModel({ model: "gemini-pro" }, safetySettings, generationConfig);
@@ -138,21 +140,30 @@ export default (props, context, vision = false) => {
             safetySettings: safetySettings,
           });
           setChatObject(chat);
-          result = await chat.sendMessageStream(query);
+          if (streamedIO) {
+            result = await chat.sendMessageStream(query);
+          } else {
+            result = await chat.sendMessage(query);
+          }
         }
       }
       var text = "";
-      for await (const chunk of result.stream) {
-        const chunkText = chunk.text();
-        text += chunkText;
-        setMarkdown(historyText + text);
+      if (streamedIO) {
+        for await (const chunk of result.stream) {
+          const chunkText = chunk.text();
+          text += chunkText;
+          setMarkdown(historyText + text);
+        }
+      } else {
+        const response = await result.response;
+        text = response.text();
       }
       setRawAnswer(text);
       setMarkdown(historyText + text);
       fs.writeFileSync(DOWNLOAD_PATH, text);
       console.log("New response saved to " + DOWNLOAD_PATH);
       // replace equations with images
-      const scriptPath = resolve(__dirname, "assets", "mathEquation.js");
+      const scriptPath = resolve(__dirname, "assets/markdownMath", "index.js");
       const commandString = `node ${scriptPath} "${DOWNLOAD_PATH}"`;
       const newMarkdown = executeShellCommand(commandString);
       setMarkdown(historyText + newMarkdown);
