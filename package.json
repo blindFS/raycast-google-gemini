@@ -4,9 +4,9 @@
   "title": "Google Gemini",
   "description": "Use the Google Gemini API in Raycast.",
   "icon": "command-icon.png",
-  "author": "EvanZhouDev",
+  "author": "blindfs",
   "contributors": [
-    "blindfs"
+    "EvanZhouDev"
   ],
   "categories": [
     "Productivity",
@@ -189,11 +189,44 @@
       "type": "password"
     },
     {
-      "description": "Whether use streamed IO or not",
+      "description": "Whether to use streamed IO or not",
       "name": "streamedIO",
+      "label": "Whether to use streamed IO or not",
       "required": false,
       "title": "Streamed IO",
       "type": "checkbox"
+    },
+    {
+      "description": "Whether to use mathjax-node to post-render math equations",
+      "name": "enableMathjax",
+      "label": "Whether to use mathjax-node to post-render math equations",
+      "required": false,
+      "title": "Enable mathjax",
+      "type": "checkbox"
+    },
+    {
+      "description": "Temperature used for text generation",
+      "name": "temperature",
+      "required": false,
+      "title": "Temperature",
+      "type": "textfield",
+      "default": "0.01"
+    },
+    {
+      "description": "Choose from the top tokens that cumulate to no more than probability P",
+      "name": "topP",
+      "required": false,
+      "title": "Top P",
+      "type": "textfield",
+      "default": "0.05"
+    },
+    {
+      "description": "Choose among top K tokens each time",
+      "name": "topK",
+      "required": false,
+      "title": "Top K",
+      "type": "textfield",
+      "default": "3"
     }
   ],
   "dependencies": {
@@ -216,6 +249,7 @@
     "dev": "ray develop",
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
-    "publish": "npx @raycast/api@latest publish"
+    "publish": "npx @raycast/api@latest publish",
+    "postinstall": "cd assets/markdownMath && npm install"
   }
 }

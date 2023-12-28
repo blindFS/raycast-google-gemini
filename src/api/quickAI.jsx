@@ -62,11 +62,13 @@ async function urlToGenerativePart(fileUrl) {
 
 export default (props, context, vision = false) => {
   const { query: argQuery } = props.arguments;
-  const { apiKey, streamedIO } = getPreferenceValues();
+  const { apiKey, streamedIO, enableMathjax, temperature, topP, topK } = getPreferenceValues();
+  generationConfig.temperature = parseFloat(temperature);
+  generationConfig.topP = parseFloat(topP);
+  generationConfig.topK = parseInt(topK);
   const { push, pop } = useNavigation();
   const [markdown, setMarkdown] = useState("");
   const [rawAnswer, setRawAnswer] = useState("");
-  const [DOM, setDOM] = useState(<Detail markdown={markdown}></Detail>);
   const [chatObject, setChatObject] = useState(null);
 
   const getResponse = async (query, enable_vision = false) => {
@@ -76,8 +78,6 @@ export default (props, context, vision = false) => {
     const start = Date.now();
     try {
       var result;
-      var model_name = "gemini-pro";
-      var imagePart = null;
       if (chatObject) {
         setMarkdown(historyText + "...");
         await showToast({
@@ -86,6 +86,8 @@ export default (props, context, vision = false) => {
         });
         result = await chatObject.sendMessageStream(query);
       } else {
+        var model_name = "gemini-pro";
+        var imagePart = null;
         if (enable_vision) {
           model_name = "gemini-pro-vision";
           // read image from clipboard
@@ -155,13 +157,15 @@ export default (props, context, vision = false) => {
       }
       setRawAnswer(text);
       setMarkdown(historyText + text);
-      fs.writeFileSync(DOWNLOAD_PATH, text);
-      console.log("New response saved to " + DOWNLOAD_PATH);
-      // replace equations with images
-      const scriptPath = resolve(__dirname, "assets/markdownMath", "index.js");
-      const commandString = `node ${scriptPath} "${DOWNLOAD_PATH}"`;
-      const newMarkdown = executeShellCommand(commandString);
-      setMarkdown(historyText + newMarkdown);
+      if (enableMathjax) {
+        fs.writeFileSync(DOWNLOAD_PATH, text);
+        console.log("New response saved to " + DOWNLOAD_PATH);
+        // replace equations with images
+        const scriptPath = resolve(__dirname, "assets/markdownMath", "index.js");
+        const commandString = `node ${scriptPath} "${DOWNLOAD_PATH}"`;
+        const newMarkdown = executeShellCommand(commandString);
+        setMarkdown(historyText + newMarkdown);
+      }
       // show success toast
       await showToast({
         style: Toast.Style.Success,
@@ -183,76 +187,67 @@ export default (props, context, vision = false) => {
     (async () => {
       try {
         getResponse(`${context ? `${context}\n\n` : ""}${argQuery ? argQuery : await getSelectedText()}`, vision);
-        setDOM(<Detail markdown={markdown}></Detail>);
       } catch (e) {
-        if (argQuery) {
-          getResponse(`${context ? `${context}\n\n` : ""}${argQuery}`, vision);
-          setDOM(<Detail markdown={markdown}></Detail>);
-        } else {
-          setDOM(
-            <Form
-              actions={
-                <ActionPanel>
-                  <Action.SubmitForm
-                    onSubmit={(values) => {
-                      getResponse(values.query, vision);
-                    }}
-                  />
-                </ActionPanel>
-              }
-            >
-              <Form.TextField id="query" title="Query" />
-            </Form>
-          );
-        }
+        push(
+          <Form
+            actions={
+              <ActionPanel>
+                <Action.SubmitForm
+                  onSubmit={(values) => {
+                    getResponse(values.query, vision);
+                    pop();
+                  }}
+                />
+              </ActionPanel>
+            }
+          >
+            <Form.TextField id="query" title="Query" />
+          </Form>
+        );
       }
     })();
   }, []);
 
-  useEffect(() => {
-    setDOM(
-      <Detail
-        markdown={markdown}
-        actions={
-          <ActionPanel>
-            <Action
-              title="Reply"
-              onAction={() => {
-                push(
-                  <Form
-                    actions={
-                      <ActionPanel>
-                        <Action.SubmitForm
-                          onSubmit={(values) => {
-                            if (values.replyText) {
-                              getResponse(values.replyText, vision);
-                            } else {
-                              showToast({
-                                style: Toast.Style.Success,
-                                title: "Cancelled reply",
-                              });
-                            }
-                            pop();
-                          }}
-                        />
-                      </ActionPanel>
-                    }
-                  >
-                    <Form.TextArea
-                      id="replyText"
-                      title="reply with following text"
-                      placeholder="explain more"
-                    ></Form.TextArea>
-                  </Form>
-                );
-              }}
-            />
-            <Action.CopyToClipboard content={rawAnswer} shortcut={{ modifiers: ["cmd"], key: "c" }} />
-          </ActionPanel>
-        }
-      ></Detail>
-    );
-  }, [markdown]);
-
-  return DOM;
+  return (
+    <Detail
+      markdown={markdown}
+      actions={
+        <ActionPanel>
+          <Action
+            title="Reply"
+            onAction={() => {
+              push(
+                <Form
+                  actions={
+                    <ActionPanel>
+                      <Action.SubmitForm
+                        onSubmit={(values) => {
+                          if (values.replyText) {
+                            getResponse(values.replyText, vision);
+                          } else {
+                            showToast({
+                              style: Toast.Style.Success,
+                              title: "Cancelled reply",
+                            });
+                          }
+                          pop();
+                        }}
+                      />
+                    </ActionPanel>
+                  }
+                >
+                  <Form.TextArea
+                    id="replyText"
+                    title="reply with following text"
+                    placeholder="explain more"
+                  ></Form.TextArea>
+                </Form>
+              );
+            }}
+          />
+          <Action.CopyToClipboard content={rawAnswer} shortcut={{ modifiers: ["cmd"], key: "c" }} />
+        </ActionPanel>
+      }
+    ></Detail>
+  );
 };
