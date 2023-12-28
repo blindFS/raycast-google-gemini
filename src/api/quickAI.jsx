@@ -47,7 +47,11 @@ async function pathToGenerativePart(path, mimeType) {
   };
 }
 
-async function arrayBufferToGenerativePart(arrayBuffer, mimeType) {
+async function urlToGenerativePart(fileUrl) {
+  const response = await fetch(fileUrl);
+  const arrayBuffer = await response.arrayBuffer();
+  const fileType = await fileTypeFromBuffer(arrayBuffer);
+  const mimeType = await fileType.mime;
   return {
     inlineData: {
       data: Buffer.from(arrayBuffer).toString("base64"),
@@ -69,47 +73,35 @@ export default (props, context, vision = false) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const textTemplate = `\n\n👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
-
-    await showToast({
-      style: Toast.Style.Animated,
-      title: "Waiting for Gemini...",
-    });
-
     const start = Date.now();
     try {
       var result;
+      var model_name = "gemini-pro";
+      var imagePart = null;
       if (chatObject) {
         setMarkdown(historyText + "...");
+        await showToast({
+          style: Toast.Style.Animated,
+          title: "Waiting for Gemini...",
+        });
         result = await chatObject.sendMessageStream(query);
       } else {
         if (enable_vision) {
-          const model = genAI.getGenerativeModel({ model: "gemini-pro-vision" }, safetySettings, generationConfig);
+          model_name = "gemini-pro-vision";
           // read image from clipboard
           const { text, file } = await Clipboard.read();
           var fileUrl = file;
-          var imageParts = [];
           if (fileUrl) {
-            const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
-            historyText = markdown + imageTemplate;
-            setMarkdown(historyText + "...");
             const path = url.fileURLToPath(fileUrl);
             const mime = "image/png";
-            imageParts = [await pathToGenerativePart(path, mime)];
+            imagePart = pathToGenerativePart(path, mime);
           } else {
             const parsedUrl = new URL(text);
             if (parsedUrl.protocol) {
               // download image from parsedUrl.href to IMAGE_PATH
               fileUrl = parsedUrl.href;
-              const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
-              historyText = markdown + imageTemplate;
-              setMarkdown(historyText + "...");
-              const response = await fetch(fileUrl);
-              const arrayBuffer = await response.arrayBuffer();
-              const fileType = await fileTypeFromBuffer(arrayBuffer);
-              const mime = await fileType.mime;
-              imageParts = [await arrayBufferToGenerativePart(arrayBuffer, mime)];
+              imagePart = urlToGenerativePart(fileUrl);
             } else {
-              setMarkdown("Please copy an image or an image link to clipboard.");
               // show toast
               await showToast({
                 style: Toast.Style.Failure,
@@ -120,33 +112,36 @@ export default (props, context, vision = false) => {
             }
           }
           console.log(fileUrl);
-          const chat = model.startChat({
-            history: [],
-            generationConfig: generationConfig,
-            safetySettings: safetySettings,
-          });
-          setChatObject(chat);
-          if (streamedIO) {
-            result = await chat.sendMessageStream([query, ...imageParts]);
-          } else {
-            result = await chat.sendMessage([query, ...imageParts]);
-          }
+          const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+          historyText = markdown + imageTemplate;
+        }
+        // common behavior for all models
+        setMarkdown(historyText + "...");
+        await showToast({
+          style: Toast.Style.Animated,
+          title: "Preparing image...",
+        });
+        const messageInfo = imagePart ? [query, await imagePart] : query;
+        await showToast({
+          style: Toast.Style.Animated,
+          title: "Waiting for Gemini...",
+        });
+
+        const model = genAI.getGenerativeModel({ model: model_name }, safetySettings, generationConfig);
+        const chat = model.startChat({
+          history: [],
+          generationConfig: generationConfig,
+          safetySettings: safetySettings,
+        });
+        setChatObject(chat);
+        if (streamedIO) {
+          result = await chat.sendMessageStream(messageInfo);
         } else {
-          setMarkdown(historyText + "...");
-          const model = genAI.getGenerativeModel({ model: "gemini-pro" }, safetySettings, generationConfig);
-          const chat = model.startChat({
-            history: [],
-            generationConfig: generationConfig,
-            safetySettings: safetySettings,
-          });
-          setChatObject(chat);
-          if (streamedIO) {
-            result = await chat.sendMessageStream(query);
-          } else {
-            result = await chat.sendMessage(query);
-          }
+          result = await chat.sendMessage(messageInfo);
         }
       }
+
+      // post process of response text
       var text = "";
       if (streamedIO) {
         for await (const chunk of result.stream) {
@@ -167,7 +162,7 @@ export default (props, context, vision = false) => {
       const commandString = `node ${scriptPath} "${DOWNLOAD_PATH}"`;
       const newMarkdown = executeShellCommand(commandString);
       setMarkdown(historyText + newMarkdown);
-      // show toast
+      // show success toast
       await showToast({
         style: Toast.Style.Success,
         title: "Response Loaded",
@@ -175,6 +170,7 @@ export default (props, context, vision = false) => {
       });
     } catch (e) {
       console.error(e);
+      push(<Detail markdown={e.message} />);
       await showToast({
         style: Toast.Style.Failure,
         title: "Response Failed",
@@ -233,7 +229,7 @@ export default (props, context, vision = false) => {
                             } else {
                               showToast({
                                 style: Toast.Style.Success,
-                                title: "Going back",
+                                title: "Cancelled reply",
                               });
                             }
                             pop();
@@ -251,7 +247,7 @@ export default (props, context, vision = false) => {
                 );
               }}
             />
-            <Action.CopyToClipboard content={rawAnswer} shortcut={{ modifiers: ["cmd"], key: "." }} />
+            <Action.CopyToClipboard content={rawAnswer} shortcut={{ modifiers: ["cmd"], key: "c" }} />
           </ActionPanel>
         }
       ></Detail>
