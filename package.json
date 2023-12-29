@@ -123,12 +123,54 @@
       "name": "image-qa",
       "title": "Image QA",
       "subtitle": "Google Gemini",
-      "description": "Answer question in text, given the png image from clipboard",
+      "description": "Answer question in text, given the image from clipboard",
       "mode": "view",
       "arguments": [
         {
           "name": "query",
           "placeholder": "Query",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "doc-qa",
+      "title": "Document QA",
+      "subtitle": "Google Gemini",
+      "description": "Answer question given extra context in url, url from clipboard by default",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "query",
+          "placeholder": "Query",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "docLink",
+          "placeholder": "Doc Link",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "search-qa",
+      "title": "Search QA",
+      "subtitle": "Google Gemini",
+      "description": "Answer question based on Google search results",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "query",
+          "placeholder": "Query",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "searchQuery",
+          "placeholder": "Query to Google",
           "type": "text",
           "required": false
         }
@@ -189,6 +231,20 @@
       "type": "password"
     },
     {
+      "description": "Search API Key",
+      "name": "searchApiKey",
+      "required": false,
+      "title": "Google Search API Key",
+      "type": "password"
+    },
+    {
+      "description": "Search Engine ID",
+      "name": "searchEngineID",
+      "required": false,
+      "title": "Google Programmable Search Engine ID",
+      "type": "textfield"
+    },
+    {
       "description": "Whether to use streamed IO or not",
       "name": "streamedIO",
       "label": "Whether to use streamed IO or not",
@@ -234,7 +290,9 @@
     "@raycast/api": "^1.56.0",
     "@raycast/utils": "^1.9.0",
     "file-type": "^18.7.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "html-to-text": "^9.0.5",
+    "cheerio": "^1.0.0-rc.12"
   },
   "devDependencies": {
     "@raycast/eslint-config": "1.0.5",
