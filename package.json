@@ -123,12 +123,18 @@
       "name": "image-qa",
       "title": "Image QA",
       "subtitle": "Google Gemini",
-      "description": "Answer question in text, given the image from clipboard",
+      "description": "Answer question in text, given the image, from clipboard by default",
       "mode": "view",
       "arguments": [
         {
           "name": "query",
           "placeholder": "Query",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "docLink",
+          "placeholder": "Image Link",
           "type": "text",
           "required": false
         }
@@ -175,6 +181,13 @@
           "required": false
         }
       ]
+    },
+    {
+      "name": "history",
+      "title": "Search Chat History",
+      "subtitle": "Google Gemini",
+      "description": "Search chat history",
+      "mode": "view"
     },
     {
       "name": "grammar",

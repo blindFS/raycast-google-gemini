@@ -1,19 +1,22 @@
 import { Form, Detail, ActionPanel, Action, useNavigation, open } from "@raycast/api";
 import { Toast, environment, showToast } from "@raycast/api";
 import { getSelectedText } from "@raycast/api";
-import { useState, useEffect } from "react";
 import { getPreferenceValues } from "@raycast/api";
-import { Clipboard } from "@raycast/api";
+import { LocalStorage } from "@raycast/api";
+import { useState, useEffect } from "react";
 import { resolve } from "path";
-import { execSync } from "child_process";
-import { fileTypeFromBuffer } from "file-type";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
-import { setTimeout } from "timers";
-import { convert } from "html-to-text";
-import cheerio from "cheerio";
 import fs from "fs";
-import url from "url";
 import fetch from "node-fetch";
+import {
+  retrievalTypes,
+  getRetrieval,
+  getExtraContext,
+  executeShellCommand,
+  pathToGenerativePart,
+  urlToGenerativePart,
+  parseLink,
+} from "./utils";
 
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 globalThis.fetch = fetch;
@@ -29,113 +32,6 @@ const generationConfig = {
   topP: 0.01,
   topK: 1,
 };
-
-async function retrieveByUrl(urlText = "", title = "") {
-  if (!urlText) urlText = await Clipboard.readText();
-  const parsedUrl = new URL(urlText);
-  showToast({
-    style: Toast.Style.Animated,
-    title: "Extracting context from the URL in clipboard",
-    message: parsedUrl.href,
-  });
-  const controller = new AbortController();
-  setTimeout(() => {
-    controller.abort();
-  }, 5000);
-  const response = await fetch(parsedUrl.href, { signal: controller.signal });
-  const rawHTML = await response.text();
-  showToast({
-    style: Toast.Style.Success,
-    title: "Content extraction successful",
-  });
-  if (!title) {
-    const $ = cheerio.load(rawHTML);
-    title = $("title").text();
-  }
-  const converted = convert(rawHTML, { wordwrap: 130 });
-  return {
-    href: parsedUrl.href,
-    title: title,
-    content: converted,
-  };
-}
-
-const retrievalTypes = {
-  None: 0,
-  URL: 1,
-  Google: 2,
-};
-
-async function getRetrieval(searchQuery, retrievalType, searchApiKey = "", searchEngineID = "", URL = "", topN = 10) {
-  var retrievalObjects = [];
-  if (retrievalType == retrievalTypes.URL) {
-    const retrievalObject = await retrieveByUrl(URL);
-    if (retrievalObject) retrievalObjects.push(retrievalObject);
-  } else if (retrievalType == retrievalTypes.Google) {
-    const googleSearchUrl = "https://www.googleapis.com/customsearch/v1?";
-    const params = {
-      key: searchApiKey,
-      cx: searchEngineID,
-      q: searchQuery,
-    };
-    const controller = new AbortController();
-    setTimeout(() => {
-      controller.abort();
-    }, 5000);
-    showToast({
-      style: Toast.Style.Animated,
-      title: "Google Searching",
-      message: "query: " + searchQuery,
-    });
-    const response = await fetch(googleSearchUrl + new URLSearchParams(params), { signal: controller.signal });
-    const json = await response.json();
-    showToast({
-      style: Toast.Style.Success,
-      title: "Got google top results",
-    });
-    for (const item of json.items.slice(0, topN)) {
-      retrievalObjects.push({
-        href: item.link,
-        title: item.title,
-        content: item.snippet,
-      });
-    }
-  }
-  return retrievalObjects;
-}
-
-function executeShellCommand(command) {
-  try {
-    const result = execSync(command, { encoding: "utf-8" });
-    return result.trim();
-  } catch (error) {
-    console.error(`Error executing shell command: ${error}`);
-    return "";
-  }
-}
-
-// Converts local file information to a GoogleGenerativeAI.Part object.
-async function pathToGenerativePart(path, mimeType) {
-  return {
-    inlineData: {
-      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
-      mimeType,
-    },
-  };
-}
-
-async function urlToGenerativePart(fileUrl) {
-  const response = await fetch(fileUrl);
-  const arrayBuffer = await response.arrayBuffer();
-  const fileType = await fileTypeFromBuffer(arrayBuffer);
-  const mimeType = await fileType.mime;
-  return {
-    inlineData: {
-      data: Buffer.from(arrayBuffer).toString("base64"),
-      mimeType,
-    },
-  };
-}
 
 export default (props, context, vision = false, retrievalType = retrievalTypes.None) => {
   const { query: argQuery } = props.arguments;
@@ -154,6 +50,8 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
   const [rawAnswer, setRawAnswer] = useState("");
   const [extraContext, setExtraContext] = useState("");
   const [chatObject, setChatObject] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [chatKey] = useState(Date.now().toString());
 
   const getResponse = async (query, enable_vision = false) => {
     var retrievalObjects = [];
@@ -174,83 +72,50 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
     }
     const textTemplate = `\n\n👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n 🤖: \n\n`;
     if (retrievalObjects.length > 0) {
-      setMetadata(
-        <Detail.Metadata>
-          <Detail.Metadata.TagList title="Extra Context">
-            {retrievalObjects.map((retrievalObject) => (
-              <Detail.Metadata.TagList.Item
-                key={retrievalObject.href}
-                text={retrievalObject.title}
-                onAction={() => open(retrievalObject.href)}
-              />
-            ))}
-          </Detail.Metadata.TagList>
-          <Detail.Metadata.Separator />
-        </Detail.Metadata>
-      );
-
-      const initalContext =
-        "\n\nextra context:\n\n" +
-        retrievalObjects
-          .map(
-            (retrievalObject) =>
-              `title: ${retrievalObject.title}\n\nbody: ${retrievalObject.content.slice(0, 20000)}\n\n`
-          )
-          .join(" ----------------------- \n\n");
-      setExtraContext(initalContext);
-      query += initalContext;
+      setMetadata(retrievalObjects);
+      const initialContext = getExtraContext(retrievalObjects);
+      setExtraContext(initialContext);
+      query += initialContext;
     }
     const genAI = new GoogleGenerativeAI(apiKey);
     var historyText = markdown + textTemplate;
     const start = Date.now();
     try {
-      var result;
+      var chatBot = chatObject;
+      var messageInfo = query;
+      // continue with the chat context
       if (chatObject) {
         setMarkdown(historyText + "...");
+        setLoading(true);
         await showToast({
           style: Toast.Style.Animated,
           title: "Waiting for Gemini...",
         });
-        result = await chatObject.sendMessageStream(query);
       } else {
         var model_name = "gemini-pro";
         var imagePart = null;
         if (enable_vision) {
           model_name = "gemini-pro-vision";
-          // read image from clipboard
-          const { text, file } = await Clipboard.read();
-          var fileUrl = file;
-          if (fileUrl) {
-            const path = url.fileURLToPath(fileUrl);
+          const { fileUrl, filePath } = await parseLink(argURL);
+          if (filePath) {
             const mime = "image/png";
-            imagePart = pathToGenerativePart(path, mime);
+            imagePart = pathToGenerativePart(filePath, mime);
           } else {
-            const parsedUrl = new URL(text);
-            if (parsedUrl.protocol) {
-              // download image from parsedUrl.href to IMAGE_PATH
-              fileUrl = parsedUrl.href;
-              imagePart = urlToGenerativePart(fileUrl);
-            } else {
-              // show toast
-              await showToast({
-                style: Toast.Style.Failure,
-                title: "No image found",
-                message: "Please copy an image or an image link to clipboard.",
-              });
-              return;
-            }
+            imagePart = urlToGenerativePart(fileUrl);
           }
+
           console.log(fileUrl);
           const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
           historyText = markdown + imageTemplate;
         }
         // common behavior for all models
         setMarkdown(historyText + "...");
+        setLoading(true);
         await showToast({
           style: Toast.Style.Animated,
           title: "Preparing image...",
         });
-        const messageInfo = imagePart ? [query, await imagePart] : query;
+        messageInfo = imagePart ? [query, await imagePart] : query;
         await showToast({
           style: Toast.Style.Animated,
           title: "Waiting for Gemini...",
@@ -263,11 +128,13 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
           safetySettings: safetySettings,
         });
         setChatObject(chat);
-        if (streamedIO) {
-          result = await chat.sendMessageStream(messageInfo);
-        } else {
-          result = await chat.sendMessage(messageInfo);
-        }
+        chatBot = chat;
+      }
+      var result;
+      if (streamedIO) {
+        result = await chatBot.sendMessageStream(messageInfo);
+      } else {
+        result = await chatBot.sendMessage(messageInfo);
       }
 
       // post process of response text
@@ -294,6 +161,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
         setMarkdown(historyText + newMarkdown);
       }
       // show success toast
+      setLoading(false);
       await showToast({
         style: Toast.Style.Success,
         title: "Response Loaded",
@@ -301,6 +169,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
       });
     } catch (e) {
       console.error(e);
+      setLoading(false);
       push(<Detail markdown={e.message} />);
       await showToast({
         style: Toast.Style.Failure,
@@ -343,10 +212,30 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
     })();
   }, []);
 
+  useEffect(() => {
+    LocalStorage.setItem(chatKey, JSON.stringify({ query: argQuery, markdown: markdown, metadata: metadata }));
+  }, [markdown, metadata]);
+
   return (
     <Detail
       markdown={markdown}
-      metadata={metadata}
+      metadata={
+        metadata && (
+          <Detail.Metadata>
+            <Detail.Metadata.TagList title="Extra Context">
+              {metadata.map((retrievalObject) => (
+                <Detail.Metadata.TagList.Item
+                  key={retrievalObject.href}
+                  text={retrievalObject.title}
+                  onAction={() => open(retrievalObject.href)}
+                />
+              ))}
+            </Detail.Metadata.TagList>
+            <Detail.Metadata.Separator />
+          </Detail.Metadata>
+        )
+      }
+      isLoading={loading}
       actions={
         <ActionPanel>
           <Action
@@ -377,7 +266,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                     title="reply with following text"
                     placeholder="..."
                     defaultValue={argQuery}
-                  ></Form.TextArea>
+                  />
                 </Form>
               );
             }}
