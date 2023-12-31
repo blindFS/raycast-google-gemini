@@ -183,6 +183,21 @@
       ]
     },
     {
+      "name": "iterative-rag",
+      "title": "Iterative RAG",
+      "subtitle": "Google Gemini",
+      "description": "Answer questions based on multiple rounds of Google search and document reading",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "query",
+          "placeholder": "Query",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
       "name": "history",
       "title": "Search Chat History",
       "subtitle": "Google Gemini",
@@ -312,7 +327,7 @@
     "@types/node": "20.10.5",
     "@types/react": "18.2.45",
     "eslint": "^7.32.0",
-    "is-text-path": "^2.0.0",
+    "is-binary-path": "^2.1.0",
     "prettier": "^2.5.1",
     "typescript": "^5.3.3"
   },

@@ -40,7 +40,8 @@ export default function History() {
               <List.Item.Detail
                 markdown={dialogue.markdown}
                 metadata={
-                  dialogue.metadata && (
+                  dialogue.metadata &&
+                  dialogue.metadata.length > 0 && (
                     <List.Item.Detail.Metadata>
                       <List.Item.Detail.Metadata.TagList title="Extra Context">
                         {dialogue.metadata.map((retrievalObject) => (
@@ -61,7 +62,7 @@ export default function History() {
           return (
             <List.Item
               key={key}
-              title={dialogue.query}
+              title={dialogue.query || ""}
               subtitle={date.toDateString()}
               {...prop}
               actions={
@@ -99,7 +100,7 @@ export default function History() {
                           onAction: async () => {
                             await LocalStorage.removeItem(key);
                             await reloadHistory();
-                          }
+                          },
                         },
                       });
                     }}
@@ -120,7 +121,7 @@ export default function History() {
                           onAction: async () => {
                             await LocalStorage.clear();
                             await reloadHistory();
-                          }
+                          },
                         },
                       });
                     }}

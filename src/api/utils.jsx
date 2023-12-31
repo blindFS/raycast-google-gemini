@@ -6,7 +6,7 @@ import { convert } from "html-to-text";
 import { assert } from "console";
 import { Toast, showToast } from "@raycast/api";
 import cheerio from "cheerio";
-import isTextPath from "is-text-path";
+import isBinaryPath from "is-binary-path";
 import url from "url";
 import fs from "fs";
 import path from "path";
@@ -43,17 +43,19 @@ export async function parseLink(pathOrURL = "") {
   };
 }
 
-async function retrieveByUrl(urlText = "", title = "") {
+export async function retrieveByUrl(urlText = "", title = "") {
   const { fileUrl, filePath } = await parseLink(urlText);
   if (filePath !== "") {
-    const isText = isTextPath(filePath);
+    console.log(filePath);
+    const isText = !isBinaryPath(filePath);
+    console.log(isText);
     if (isText) {
       return { href: filePath, title: path.basename(filePath), content: fs.readFileSync(filePath, "utf8") };
     }
     const fType = await fileTypeFromFile(filePath);
     const mime = fType.mime || "unknown";
     // if (mime == "application/pdf") {
-      // TODO handle PDF extract
+    // TODO handle PDF extract
     // } else {
     throw new Error(`FileType ${mime} is currently not supported in this mode.`);
     // }
@@ -173,13 +175,15 @@ export async function urlToGenerativePart(fileUrl) {
   }
 }
 
-export function getExtraContext(retrievalObjects) {
+export function getExtraContext(retrievalObjects, separator = "\n\n====================\n\n") {
   return retrievalObjects.length > 0
-    ? "\n\n====================\n\n" +
+    ? separator +
         retrievalObjects
           .map(
-            (retrievalObject) =>
-              `**Title**: ${retrievalObject.title}\n\n**Body**: ${retrievalObject.content.slice(0, 20000)}\n\n`
+            (retrievalObject, index) =>
+              `**Title ${index + 1}**: ${retrievalObject.title}\n\n**Body ${
+                index + 1
+              }**: ${retrievalObject.content.slice(0, 20000)}\n\n`
           )
           .join(" ----------------------- \n\n")
     : "";

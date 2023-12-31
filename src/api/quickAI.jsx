@@ -8,7 +8,7 @@ import { useChat } from "./hook/useChat";
 export default (props, context, vision = false, retrievalType = retrievalTypes.None) => {
   const { query: argQuery } = props.arguments;
   const { push, pop } = useNavigation();
-  const { markdown, metadata, rawAnswer, extraContext, loading, getResponse } = useChat(props);
+  const { markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse } = useChat(props);
 
   useEffect(() => {
     (async () => {
@@ -41,7 +41,8 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
     <Detail
       markdown={markdown}
       metadata={
-        metadata && (
+        metadata &&
+        metadata.length > 0 && (
           <Detail.Metadata>
             <Detail.Metadata.TagList title="Extra Context">
               {metadata.map((retrievalObject) => (
@@ -87,7 +88,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                     id="replyText"
                     title="reply with following text"
                     placeholder="..."
-                    defaultValue={argQuery}
+                    defaultValue={suggestion.current}
                   />
                 </Form>
               );
@@ -95,6 +96,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
           />
           <Action
             title="View Extra Context"
+            icon={Icon.Document}
             onAction={() => {
               push(<Detail markdown={extraContext.current} />);
             }}
