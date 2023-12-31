@@ -1,14 +1,13 @@
-// import { useState } from "react";
-import { Action, ActionPanel, List, Detail, Form } from "@raycast/api";
+import { Action, ActionPanel, List } from "@raycast/api";
 import { open, Icon, Alert, confirmAlert } from "@raycast/api";
-import { useNavigation, LocalStorage } from "@raycast/api";
+import { LocalStorage } from "@raycast/api";
 import { useEffect, useState } from "react";
+import { launchCommand, LaunchType } from "@raycast/api";
 import { getExtraContext } from "./api/utils";
 
 export default function History() {
   const [data, setData] = useState();
   const [isLoading, setLoading] = useState(true);
-  const { push } = useNavigation();
 
   useEffect(() => {
     (async () => {
@@ -63,63 +62,19 @@ export default function History() {
               actions={
                 <ActionPanel>
                   <Action
-                    title="View"
-                    onAction={() => {
-                      push(
-                        <Detail
-                          markdown={dialogue.markdown}
-                          metadata={
-                            dialogue.metadata && (
-                              <Detail.Metadata>
-                                <Detail.Metadata.TagList title="Extra Context">
-                                  {dialogue.metadata.map((retrievalObject) => (
-                                    <Detail.Metadata.TagList.Item
-                                      key={retrievalObject.href}
-                                      text={retrievalObject.title}
-                                      onAction={() => open(retrievalObject.href)}
-                                    />
-                                  ))}
-                                </Detail.Metadata.TagList>
-                                <Detail.Metadata.Separator />
-                              </Detail.Metadata>
-                            )
-                          }
-                          actions={
-                            <ActionPanel>
-                              <Action
-                                title="Reply"
-                                onAction={() => {
-                                  push(
-                                    <Form
-                                      actions={
-                                        <ActionPanel>
-                                          <Action.SubmitForm
-                                            onSubmit={(values) => {
-                                              console.log(values.replyText);
-                                            }}
-                                          />
-                                        </ActionPanel>
-                                      }
-                                    >
-                                      <Form.TextArea
-                                        id="replyText"
-                                        title="reply with following text"
-                                        placeholder="..."
-                                      />
-                                    </Form>
-                                  );
-                                }}
-                              />
-                              <Action
-                                title="View Extra Context"
-                                onAction={() => {
-                                  push(<Detail markdown={getExtraContext(dialogue.metadata)} />);
-                                }}
-                              />
-                            </ActionPanel>
-                          }
-                        ></Detail>
-                      );
+                    title="Continue"
+                    onAction={async () => {
+                      await launchCommand({
+                        name: "ask-ai",
+                        type: LaunchType.UserInitiated,
+                        context: {
+                          chatID: key,
+                          markdown: dialogue.markdown,
+                          metadata: dialogue.metadata,
+                          history: dialogue.history,
+                          extraContext: getExtraContext(dialogue.metadata),
+                        },
+                      });
                     }}
                   />
                   <Action.CopyToClipboard content={dialogue.markdown} shortcut={{ modifiers: ["cmd"], key: "c" }} />
