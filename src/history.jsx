@@ -9,18 +9,23 @@ export default function History() {
   const [data, setData] = useState();
   const [isLoading, setLoading] = useState(true);
 
+  async function reloadHistory() {
+    setLoading(true);
+    const storedHistory = await LocalStorage.allItems();
+    if (storedHistory) {
+      setData(
+        Object.entries(storedHistory).map((pair) => {
+          var [key, dialogue] = pair;
+          return [key, JSON.parse(dialogue)];
+        })
+      );
+    }
+    setLoading(false);
+  }
+
   useEffect(() => {
     (async () => {
-      const storedHistory = await LocalStorage.allItems();
-      if (storedHistory) {
-        setData(
-          Object.entries(storedHistory).map((pair) => {
-            var [key, dialogue] = pair;
-            return [key, JSON.parse(dialogue)];
-          })
-        );
-      }
-      setLoading(false);
+      await reloadHistory();
     })();
   }, []);
 
@@ -63,6 +68,7 @@ export default function History() {
                 <ActionPanel>
                   <Action
                     title="Continue"
+                    icon={Icon.Reply}
                     onAction={async () => {
                       await launchCommand({
                         name: "ask-ai",
@@ -90,7 +96,10 @@ export default function History() {
                         primaryAction: {
                           title: "Confirm Remove",
                           style: Alert.ActionStyle.Destructive,
-                          onAction: () => LocalStorage.removeItem(key),
+                          onAction: async () => {
+                            await LocalStorage.removeItem(key);
+                            await reloadHistory();
+                          }
                         },
                       });
                     }}
@@ -108,7 +117,10 @@ export default function History() {
                         primaryAction: {
                           title: "Confirm Clear",
                           style: Alert.ActionStyle.Destructive,
-                          onAction: () => LocalStorage.clear(),
+                          onAction: async () => {
+                            await LocalStorage.clear();
+                            await reloadHistory();
+                          }
                         },
                       });
                     }}

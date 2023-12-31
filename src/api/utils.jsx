@@ -1,13 +1,15 @@
 import { Clipboard } from "@raycast/api";
 import { execSync } from "child_process";
-import { fileTypeFromBuffer } from "file-type";
+import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 import { setTimeout } from "timers";
 import { convert } from "html-to-text";
 import { assert } from "console";
 import { Toast, showToast } from "@raycast/api";
 import cheerio from "cheerio";
+import isTextPath from "is-text-path";
 import url from "url";
 import fs from "fs";
+import path from "path";
 
 export async function parseLink(pathOrURL = "") {
   var fileUrl = "";
@@ -44,7 +46,17 @@ export async function parseLink(pathOrURL = "") {
 async function retrieveByUrl(urlText = "", title = "") {
   const { fileUrl, filePath } = await parseLink(urlText);
   if (filePath !== "") {
-    throw new Error("Local file is currently not supported in this mode.");
+    const isText = isTextPath(filePath);
+    if (isText) {
+      return { href: filePath, title: path.basename(filePath), content: fs.readFileSync(filePath, "utf8") };
+    }
+    const fType = await fileTypeFromFile(filePath);
+    const mime = fType.mime || "unknown";
+    // if (mime == "application/pdf") {
+      // TODO handle PDF extract
+    // } else {
+    throw new Error(`FileType ${mime} is currently not supported in this mode.`);
+    // }
   }
   showToast({
     style: Toast.Style.Animated,
@@ -149,7 +161,7 @@ export async function urlToGenerativePart(fileUrl) {
     const response = await fetch(fileUrl);
     const arrayBuffer = await response.arrayBuffer();
     const fileType = await fileTypeFromBuffer(arrayBuffer);
-    const mimeType = await fileType.mime;
+    const mimeType = fileType.mime;
     return {
       inlineData: {
         data: Buffer.from(arrayBuffer).toString("base64"),

@@ -1,5 +1,5 @@
 import { Form, Detail, ActionPanel, Action, useNavigation, open } from "@raycast/api";
-import { Toast, showToast } from "@raycast/api";
+import { Toast, showToast, Icon } from "@raycast/api";
 import { getSelectedText } from "@raycast/api";
 import { useEffect } from "react";
 import { retrievalTypes } from "./utils";
@@ -61,6 +61,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
         <ActionPanel>
           <Action
             title="Reply"
+            icon={Icon.Reply}
             onAction={() => {
               push(
                 <Form
