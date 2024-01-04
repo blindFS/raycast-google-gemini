@@ -14,10 +14,12 @@ export default function History() {
     const storedHistory = await LocalStorage.allItems();
     if (storedHistory) {
       setData(
-        Object.entries(storedHistory).sort((a, b) => b[0] - a[0]).map((pair) => {
-          var [key, dialogue] = pair;
-          return [key, JSON.parse(dialogue)];
-        })
+        Object.entries(storedHistory)
+          .sort((a, b) => b[0] - a[0])
+          .map((pair) => {
+            var [key, dialogue] = pair;
+            return [key, JSON.parse(dialogue)];
+          })
       );
     }
     setLoading(false);

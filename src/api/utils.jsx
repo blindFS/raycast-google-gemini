@@ -43,7 +43,7 @@ export async function parseLink(pathOrURL = "") {
   };
 }
 
-export async function retrieveByUrl(urlText = "", title = "") {
+export async function retrieveByUrl(urlText = "", title = "", cleanBody = false, truncationLength = "5000") {
   const { fileUrl, filePath } = await parseLink(urlText);
   if (filePath !== "") {
     console.log(filePath);
@@ -75,15 +75,22 @@ export async function retrieveByUrl(urlText = "", title = "") {
     style: Toast.Style.Success,
     title: "Content extraction successful",
   });
-  if (!title) {
+  var body = "";
+  if (cleanBody) {
     const $ = cheerio.load(rawHTML);
-    title = $("title").text();
+    title = title || $("title").text();
+    body = $("body").text();
+  } else {
+    body = convert(rawHTML, { wordwrap: 130 });
+    if (!title) {
+      const $ = cheerio.load(rawHTML);
+      title = $("title").text();
+    }
   }
-  const converted = convert(rawHTML, { wordwrap: 130 });
   return {
     href: fileUrl,
     title: title,
-    content: converted,
+    content: body.slice(0, truncationLength),
   };
 }
 
@@ -175,16 +182,19 @@ export async function urlToGenerativePart(fileUrl) {
   }
 }
 
-export function getExtraContext(retrievalObjects, separator = "\n\n====================\n\n") {
+export function getExtraContext(retrievalObjects, markdown = true) {
+  const header = markdown ? "\n\n====================\n\n" : "";
+  const separator = markdown ? " ----------------------- \n\n" : "";
+  const decorator = markdown ? "**" : "";
   return retrievalObjects.length > 0
-    ? separator +
+    ? header +
         retrievalObjects
           .map(
             (retrievalObject, index) =>
-              `**Title ${index + 1}**: ${retrievalObject.title}\n\n**Body ${
+              `${decorator}Title ${index + 1}${decorator}: ${retrievalObject.title}\n\n${decorator}Body ${
                 index + 1
-              }**: ${retrievalObject.content.slice(0, 20000)}\n\n`
+              }${decorator}: ${retrievalObject.content.slice(0, 20000)}\n\n`
           )
-          .join(" ----------------------- \n\n")
+          .join(separator)
     : "";
 }

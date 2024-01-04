@@ -56,29 +56,28 @@ export function useChat(props) {
   const suggestion = useRef(argQuery);
   const { push } = useNavigation();
 
-  async function getSuggestion(text) {
+  const getSuggestion = async (text) => {
     suggestion.current = "";
-    const searchRegex = /^\s*?Search for (.+)$/;
+    const searchRegex = /Command:\s*?Search for (.+)$/;
     const match = text.match(searchRegex);
     if (match) {
-      console.log(match[1]);
       const newRetrievalObjects = await getRetrieval(match[1], retrievalTypes.Google, searchApiKey, searchEngineID);
       setMetadata(newRetrievalObjects);
-      suggestion.current = getExtraContext(newRetrievalObjects, "");
+      suggestion.current = getExtraContext(newRetrievalObjects, false);
     }
-    const readDocRegex = /^\s*?Full content of document (\d+)$/;
+    const readDocRegex = /Command:\s*?Full content of document (\d+)/;
     const match2 = text.match(readDocRegex);
     if (match2) {
       const docID = parseInt(match2[1]);
       if (docID >= 1 && docID <= metadata.length + 1) {
-        suggestion.current = getExtraContext([await retrieveByUrl(metadata[docID - 1].href)], "");
+        suggestion.current = (await retrieveByUrl(metadata[docID - 1].href, metadata[docID - 1].title, true)).content;
       }
     }
-  }
+  };
 
-  const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None) => {
+  const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, shortQuery = "") => {
     lastQuery.current = query;
-    const textTemplate = `\n\n👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n 🤖: \n\n`;
+    const textTemplate = `\n\n👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
     setMarkdown(historyText + "...");
     var retrievalObjects = [];
@@ -128,7 +127,9 @@ export function useChat(props) {
           }
 
           console.log(fileUrl);
-          const imageTemplate = `👤: \n\n\`\`\`\n${query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+          const imageTemplate = `👤: \n\n\`\`\`\n${
+            shortQuery || query
+          }\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
           historyText = imageTemplate;
         }
         // common behavior for all models

@@ -5,7 +5,14 @@ import { useEffect } from "react";
 import { retrievalTypes } from "./utils";
 import { useChat } from "./hook/useChat";
 
-export default (props, context, vision = false, retrievalType = retrievalTypes.None) => {
+const getFullQuery = (query, context, examples) => {
+  if (typeof context === "function") {
+    return context(query, examples);
+  }
+  return `${context ? `${context}\n\n` : ""}${query}`;
+};
+
+export default (props, context, vision = false, retrievalType = retrievalTypes.None, examples = "") => {
   const { query: argQuery } = props.arguments;
   const { push, pop } = useNavigation();
   const { markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse } = useChat(props);
@@ -15,7 +22,12 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
       var query = "";
       try {
         query = argQuery || (await getSelectedText());
-        getResponse(`${context ? `${context}\n\n` : ""}${query}`, vision, retrievalType);
+        getResponse(
+          getFullQuery(query, context, examples),
+          vision,
+          retrievalType,
+          examples && getFullQuery(query, context, "")
+        );
       } catch (e) {
         push(
           <Form
@@ -24,7 +36,12 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                 <Action.SubmitForm
                   onSubmit={async (values) => {
                     pop();
-                    getResponse(`${context ? `${context}\n\n` : ""}${values.query}`, vision, retrievalType);
+                    getResponse(
+                      getFullQuery(values.query, context, examples),
+                      vision,
+                      retrievalType,
+                      examples && getFullQuery(query, context, "")
+                    );
                   }}
                 />
               </ActionPanel>
