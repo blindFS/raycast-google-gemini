@@ -43,7 +43,7 @@ export async function parseLink(pathOrURL = "") {
   };
 }
 
-export async function retrieveByUrl(urlText = "", title = "", cleanBody = false, truncationLength = "5000") {
+export async function retrieveByUrl(urlText = "", title = "", cleanBody = false, truncationLength = "50000") {
   const { fileUrl, filePath } = await parseLink(urlText);
   if (filePath !== "") {
     console.log(filePath);
