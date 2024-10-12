@@ -5,7 +5,7 @@ import { setTimeout } from "timers";
 import { convert } from "html-to-text";
 import { assert } from "console";
 import { Toast, showToast } from "@raycast/api";
-import cheerio from "cheerio";
+import * as cheerio from 'cheerio';
 import isBinaryPath from "is-binary-path";
 import url from "url";
 import fs from "fs";

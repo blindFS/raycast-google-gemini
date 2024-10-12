@@ -114,10 +114,9 @@ export function useChat(props) {
           title: "Waiting for Gemini...",
         });
       } else {
-        var model_name = "gemini-pro";
+        var model_name = "gemini-1.5-flash";
         var imagePart = null;
         if (enable_vision) {
-          model_name = "gemini-pro-vision";
           const { fileUrl, filePath } = await parseLink(argURL);
           if (filePath) {
             const mime = "image/png";
@@ -172,7 +171,8 @@ export function useChat(props) {
         const response = await result.response;
         text = response.text();
       }
-      storedHistoryJson((prev) => [...prev, { role: "user", parts: query }, { role: "model", parts: text }]);
+      const history = await chatObject.current.getHistory();
+      storedHistoryJson((prev) => history);
       rawAnswer.current = text;
       setMarkdown(historyText + text);
       if (enableMathjax) {
