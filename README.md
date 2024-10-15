@@ -10,8 +10,8 @@ To test
 npm install && npm run dev
 ```
 
-@google/generative-ai
-index.mjs
+* [x] Advanced - Developer tools - Use Node production environment
+* @google/generative-ai/src/index.mjs
 
 ``` javascript
 import fetch, { Headers } from 'node-fetch';
