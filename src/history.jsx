@@ -19,7 +19,7 @@ export default function History() {
           .map((pair) => {
             var [key, dialogue] = pair;
             return [key, JSON.parse(dialogue)];
-          })
+          }),
       );
     }
     setLoading(false);

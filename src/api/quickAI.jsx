@@ -1,7 +1,7 @@
 import { Form, Detail, ActionPanel, Action, useNavigation, open } from "@raycast/api";
 import { Toast, showToast, Icon } from "@raycast/api";
 import { getSelectedText } from "@raycast/api";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { retrievalTypes } from "./utils";
 import { useChat } from "./hook/useChat";
 
@@ -16,18 +16,22 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
   const { query: argQuery } = props.arguments;
   const { push, pop } = useNavigation();
   const { markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse } = useChat(props);
+  const [query, setQuery] = useState(argQuery);
 
   useEffect(() => {
     (async () => {
-      var query = "";
       try {
-        query = argQuery || (await getSelectedText());
-        getResponse(
-          getFullQuery(query, context, examples),
-          vision,
-          retrievalType,
-          examples && getFullQuery(query, context, "")
-        );
+        if (!query) {
+          setQuery(await getSelectedText());
+        }
+        if (query) {
+          getResponse(
+            getFullQuery(query, context, examples),
+            vision,
+            retrievalType,
+            examples && getFullQuery(query, context, ""),
+          );
+        }
       } catch (e) {
         push(
           <Form
@@ -36,23 +40,18 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                 <Action.SubmitForm
                   onSubmit={async (values) => {
                     pop();
-                    getResponse(
-                      getFullQuery(values.query, context, examples),
-                      vision,
-                      retrievalType,
-                      examples && getFullQuery(query, context, "")
-                    );
+                    setQuery(values.query);
                   }}
                 />
               </ActionPanel>
             }
           >
             <Form.TextArea id="query" title="Query" defaultValue={query} placeholder="Edit your query" />
-          </Form>
+          </Form>,
         );
       }
     })();
-  }, []);
+  }, [query]);
 
   return (
     <Detail
@@ -107,7 +106,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                     placeholder="..."
                     defaultValue={suggestion.current}
                   />
-                </Form>
+                </Form>,
               );
             }}
           />

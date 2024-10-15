@@ -5,7 +5,6 @@ import { LocalStorage } from "@raycast/api";
 import { resolve } from "path";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import fs from "fs";
-import fetch from "node-fetch";
 import {
   retrievalTypes,
   retrieveByUrl,
@@ -18,7 +17,6 @@ import {
 } from "../utils";
 
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
-globalThis.fetch = fetch;
 const safetySettings = [];
 for (const category of Object.keys(HarmCategory)) {
   if (category != HarmCategory.HARM_CATEGORY_UNSPECIFIED) {
@@ -172,7 +170,7 @@ export function useChat(props) {
         text = response.text();
       }
       const history = await chatObject.current.getHistory();
-      storedHistoryJson((prev) => history);
+      storedHistoryJson(history);
       rawAnswer.current = text;
       setMarkdown(historyText + text);
       if (enableMathjax) {
@@ -208,7 +206,7 @@ export function useChat(props) {
     if (historyJson.length > 0)
       LocalStorage.setItem(
         chatID.current,
-        JSON.stringify({ query: lastQuery.current, markdown: markdown, metadata: metadata, history: historyJson })
+        JSON.stringify({ query: lastQuery.current, markdown: markdown, metadata: metadata, history: historyJson }),
       );
   }, [markdown, metadata, historyJson]);
 
@@ -222,6 +220,6 @@ export function useChat(props) {
       loading,
       getResponse,
     }),
-    [markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse]
+    [markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse],
   );
 }

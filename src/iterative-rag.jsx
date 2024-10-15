@@ -152,6 +152,6 @@ Body 5: Jan 19, 2023 … The country's population fell in 2022 to 1.411 billion,
 * You:
 - Thinking: Current information is enough to answer the question. According to document 2 of first search, China's GDP of 2022 is 17,963,171.48 million US dollar. According to document 3 of second search, China's population of 2022 is 1.411 billion.
 - Answer: China's GDP per capita of year 2022 is 17963.17 billion US dollar / 1.411 billion = 12730.8 US dollar.
-`
+`,
   );
 }

@@ -1,5 +1,7 @@
 const fs = require("fs");
 var mjAPI = require("mathjax-node");
+const Parser = require('tree-sitter');
+const MarkDown = require('@tree-sitter-grammars/tree-sitter-markdown');
 
 mjAPI.config({
   MathJax: {
@@ -8,45 +10,24 @@ mjAPI.config({
 });
 mjAPI.start();
 
-function findAllVerbatimPositions(markdown) {
-  const regex = /^[\s]*?```([\s\S]+?)```[\s]*?$|`([^`\n]+?)`/gm;
-  const verbatims = [];
-  const matches = markdown.matchAll(regex);
-  for (const match of matches) {
-    verbatims.push({
-      start: match.index,
-      end: match.index + match[0].length,
-    });
-  }
-  return verbatims;
-}
-
-async function replaceEquationsWithImages(markdown) {
-  const verbatims = findAllVerbatimPositions(markdown);
-  const regex = /\$\$([^$]+?)\$\$|\$([^\n$]+?)\$/g;
+async function replaceEquationsWithImages(markdown, parser) {
+  const tree = parser.parse(markdown);
+  const query = new Parser.Query(MarkDown.inline, '(latex_block) @math');
+  const matches = query.matches(tree.rootNode);
+  var res = markdown;
   const promises = [];
-  async function asyncReplaceFunction(match, group1, group2, offset) {
-    var needReplaceThis = true;
-    const end = offset + match.length;
-    for (const verbatim of verbatims) {
-      if ((offset >= verbatim.start && offset <= verbatim.end) || (end >= verbatim.start && end <= verbatim.end)) {
-        needReplaceThis = false;
-        break;
-      }
-    }
-    if (!needReplaceThis) {
-      promises.push(Promise.resolve(match));
-    } else {
-      const equation = group1 || group2;
-      const height = group1 ? 48 : 16;
-      const imageUrl = generateMathJaxImage(equation, height);
-      promises.push(imageUrl);
-    }
+  const ranges = [];
+  matches.reverse().forEach(match => {
+    const node = match.captures[0].node
+    ranges.push({ start: node.startIndex, end: node.endIndex });
+    promises.push(Promise.resolve(generateMathJaxImage(node.text, 16)));
+  })
+  const results = await Promise.all(promises);
+  for (const result of results) {
+    const range = ranges.shift();
+    res = res.substring(0, range.start) + result + res.substring(range.end);
   }
-
-  markdown.replace(regex, asyncReplaceFunction);
-  const data = await Promise.all(promises);
-  return markdown.replace(regex, () => data.shift());
+  return res;
 }
 
 async function generateMathJaxImage(equation, height) {
@@ -75,7 +56,11 @@ async function generateMathJaxImage(equation, height) {
 async function main(path) {
   // read from local file
   let inputStream = fs.readFileSync(path, "utf8");
-  let res = await replaceEquationsWithImages(inputStream);
+
+  const parser = new Parser();
+  parser.setLanguage(MarkDown.inline);
+
+  let res = await replaceEquationsWithImages(inputStream, parser);
   console.log(res);
 }
 

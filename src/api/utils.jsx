@@ -5,7 +5,7 @@ import { setTimeout } from "timers";
 import { convert } from "html-to-text";
 import { assert } from "console";
 import { Toast, showToast } from "@raycast/api";
-import * as cheerio from 'cheerio';
+import * as cheerio from "cheerio";
 import isBinaryPath from "is-binary-path";
 import url from "url";
 import fs from "fs";
@@ -106,7 +106,7 @@ export async function getRetrieval(
   searchApiKey = "",
   searchEngineID = "",
   URL = "",
-  topN = 10
+  topN = 10,
 ) {
   var retrievalObjects = [];
   if (retrievalType == retrievalTypes.URL) {
@@ -193,7 +193,7 @@ export function getExtraContext(retrievalObjects, markdown = true) {
             (retrievalObject, index) =>
               `${decorator}Title ${index + 1}${decorator}: ${retrievalObject.title}\n\n${decorator}Body ${
                 index + 1
-              }${decorator}: ${retrievalObject.content.slice(0, 20000)}\n\n`
+              }${decorator}: ${retrievalObject.content.slice(0, 20000)}\n\n`,
           )
           .join(separator)
     : "";
