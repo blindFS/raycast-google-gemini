@@ -261,14 +261,6 @@
       "type": "textfield"
     },
     {
-      "description": "Whether to use streamed IO or not",
-      "name": "streamedIO",
-      "label": "Whether to use streamed IO or not",
-      "required": false,
-      "title": "Streamed IO",
-      "type": "checkbox"
-    },
-    {
       "description": "Whether to use mathjax-node to post-render math equations",
       "name": "enableMathjax",
       "label": "Whether to use mathjax-node to post-render math equations",

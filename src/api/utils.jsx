@@ -1,14 +1,13 @@
-import { Clipboard } from "@raycast/api";
-import { execSync } from "child_process";
-import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
-import { setTimeout } from "timers";
-import { assert } from "console";
-import { Toast, showToast } from "@raycast/api";
+import { Clipboard, Toast, showToast } from "@raycast/api";
 import * as cheerio from "cheerio";
-import isBinaryPath from "is-binary-path";
-import url from "url";
+import { execSync } from "child_process";
+import { assert } from "console";
+import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 import fs from "fs";
+import isBinaryPath from "is-binary-path";
 import path from "path";
+import { setTimeout } from "timers";
+import url from "url";
 
 async function requestWithToast(closure, message, loading_banner, success_banner) {
   showToast({
@@ -70,6 +69,28 @@ async function parseLink(pathOrURL = "") {
   };
 }
 
+export async function rawHTMLByURL(url) {
+  const rawHTML = await requestWithToast(
+    async () => {
+      const controller = new AbortController();
+      setTimeout(() => {
+        controller.abort();
+      }, 5000);
+      const response = await fetch(url, { signal: controller.signal });
+      return await response.text();
+    },
+    url,
+    "Extracting context from the URL in clipboard",
+    "Content extraction successful",
+  );
+  const $ = cheerio.load(rawHTML);
+  return {
+    href: url,
+    title: $("title").text(),
+    content: rawHTML,
+  };
+}
+
 async function retrieveByUrl(fileManager, urlText = "") {
   const { fileUrl, filePath } = await parseLink(urlText);
   if (filePath !== "") {
@@ -109,33 +130,47 @@ async function retrieveByUrl(fileManager, urlText = "") {
       throw new Error(`FileType ${mime} is currently not supported in this mode.`);
     }
   }
-  const rawHTML = await requestWithToast(
-    async () => {
-      const controller = new AbortController();
-      setTimeout(() => {
-        controller.abort();
-      }, 5000);
-      const response = await fetch(fileUrl, { signal: controller.signal });
-      return await response.text();
-    },
-    fileUrl,
-    "Extracting context from the URL in clipboard",
-    "Content extraction successful",
-  );
-
-  const $ = cheerio.load(rawHTML);
-  return {
-    href: fileUrl,
-    title: $("title").text(),
-    content: bufferToGenerativePart(rawHTML, "text/html"),
-  };
+  // default behavior for URL
+  var rawHTMLObject = await rawHTMLByURL(fileUrl);
+  rawHTMLObject.content = bufferToGenerativePart(rawHTMLObject.content, "text/html");
+  return rawHTMLByURL;
 }
 
 export const retrievalTypes = {
   None: 0,
   URL: 1,
   Google: 2,
+  Function: 3,
 };
+
+export async function GoogleSearch(searchQuery, searchApiKey = "", searchEngineID = "", topN = 10) {
+  const googleSearchUrl = "https://www.googleapis.com/customsearch/v1?";
+  const params = {
+    key: searchApiKey,
+    cx: searchEngineID,
+    q: searchQuery,
+  };
+  const controller = new AbortController();
+  setTimeout(() => {
+    controller.abort();
+  }, 5000);
+  const json = await requestWithToast(
+    async () => {
+      const response = await fetch(googleSearchUrl + new URLSearchParams(params), { signal: controller.signal });
+      return await response.json();
+    },
+    "query: " + searchQuery,
+    "Google Searching",
+    "Got google top results",
+  );
+  return json.items.slice(0, topN).map((item) => {
+    return {
+      href: item.link,
+      title: item.title,
+      content: item.snippet,
+    };
+  });
+}
 
 export async function getRetrieval(
   fileManager,
@@ -151,32 +186,7 @@ export async function getRetrieval(
     const retrievalObject = await retrieveByUrl(fileManager, URL);
     if (retrievalObject) retrievalObjects.push(retrievalObject);
   } else if (retrievalType == retrievalTypes.Google) {
-    const googleSearchUrl = "https://www.googleapis.com/customsearch/v1?";
-    const params = {
-      key: searchApiKey,
-      cx: searchEngineID,
-      q: searchQuery,
-    };
-    const controller = new AbortController();
-    setTimeout(() => {
-      controller.abort();
-    }, 5000);
-    const json = await requestWithToast(
-      async () => {
-        const response = await fetch(googleSearchUrl + new URLSearchParams(params), { signal: controller.signal });
-        return await response.json();
-      },
-      "query: " + searchQuery,
-      "Google Searching",
-      "Got google top results",
-    );
-    for (const item of json.items.slice(0, topN)) {
-      retrievalObjects.push({
-        href: item.link,
-        title: item.title,
-        content: bufferToGenerativePart(item.snippet, "text/plain"),
-      });
-    }
+    retrievalObjects = await GoogleSearch(searchQuery, searchApiKey, searchEngineID, topN);
   }
   return retrievalObjects;
 }

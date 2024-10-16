@@ -1,9 +1,18 @@
-import { Form, Detail, ActionPanel, Action, useNavigation, open } from "@raycast/api";
-import { Toast, showToast, Icon } from "@raycast/api";
-import { getSelectedText } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  Form,
+  Icon,
+  Toast,
+  getSelectedText,
+  open,
+  showToast,
+  useNavigation,
+} from "@raycast/api";
 import { useEffect, useState } from "react";
-import { retrievalTypes } from "./utils";
 import { useChat } from "./hook/useChat";
+import { retrievalTypes } from "./utils";
 
 const getFullQuery = (query, context, examples) => {
   if (typeof context === "function") {
@@ -15,7 +24,7 @@ const getFullQuery = (query, context, examples) => {
 export default (props, context, vision = false, retrievalType = retrievalTypes.None, examples = "") => {
   const { query: argQuery } = props.arguments;
   const { push, pop } = useNavigation();
-  const { markdown, metadata, rawAnswer, suggestion, loading, getResponse } = useChat(props);
+  const { markdown, metadata, rawAnswer, loading, getResponse } = useChat(props);
   const [query, setQuery] = useState(argQuery);
 
   useEffect(() => {
@@ -100,12 +109,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                     </ActionPanel>
                   }
                 >
-                  <Form.TextArea
-                    id="replyText"
-                    title="reply with following text"
-                    placeholder="..."
-                    defaultValue={suggestion.current}
-                  />
+                  <Form.TextArea id="replyText" title="reply with following text" placeholder="..." defaultValue={""} />
                 </Form>,
               );
             }}

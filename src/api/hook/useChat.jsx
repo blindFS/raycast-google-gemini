@@ -1,17 +1,24 @@
-import { useMemo, useRef, useState, useEffect } from "react";
-import { Toast, environment, useNavigation, showToast, Detail } from "@raycast/api";
-import { getPreferenceValues } from "@raycast/api";
-import { LocalStorage } from "@raycast/api";
-import { resolve } from "path";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
+import { Detail, environment, getPreferenceValues, LocalStorage, showToast, Toast, useNavigation } from "@raycast/api";
 import fs from "fs";
 import fetch, { Headers } from "node-fetch";
+import { resolve } from "path";
+import { useEffect, useMemo, useRef, useState } from "react";
 globalThis.fetch = fetch;
 globalThis.Headers = Headers;
 
-import { retrievalTypes, getRetrieval, executeShellCommand, pathOrURLToImage } from "../utils";
+import {
+  executeShellCommand,
+  getRetrieval,
+  GoogleSearch,
+  pathOrURLToImage,
+  rawHTMLByURL,
+  retrievalTypes,
+} from "../utils";
 
+const { apiKey, defaultModel, searchApiKey, searchEngineID, enableMathjax, temperature, topP, topK } =
+  getPreferenceValues();
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 const safetySettings = [];
 for (const category of Object.keys(HarmCategory)) {
@@ -26,6 +33,51 @@ const generationConfig = {
   topK: 1,
 };
 
+const GoogleSearchFunctionDeclaration = {
+  name: "google",
+  parameters: {
+    type: "OBJECT",
+    description: "Set the query and how many docs to return.",
+    properties: {
+      query: {
+        type: "STRING",
+        description: "The query to search google for.",
+      },
+      topN: {
+        type: "NUMBER",
+        description: "Return top N related documents.",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+const GetFullContextFunctionDeclaration = {
+  name: "getFullContext",
+  parameters: {
+    type: "OBJECT",
+    description: "Set the url of the online document that you want to retrieve.",
+    properties: {
+      url: {
+        type: "STRING",
+        description: "The url of the online document that you want to retrieve.",
+      },
+    },
+    required: ["url"],
+  },
+};
+
+// Executable function code. Put it in a map keyed by the function name
+// so that you can call it once you get the name string from the model.
+const apiFunctions = {
+  google: async ({ query, topN = 5 }) => {
+    return await GoogleSearch(query, searchApiKey, searchEngineID, topN);
+  },
+  getFullContext: async ({ url }) => {
+    return [await rawHTMLByURL(url)];
+  },
+};
+
 export function useChat(props) {
   const { query: argQuery } = props.arguments;
   var { searchQuery: argGoogle } = props.arguments;
@@ -33,8 +85,6 @@ export function useChat(props) {
   argGoogle = argGoogle || argQuery;
   argURL = argURL || "";
   const context = props.launchContext || {};
-  const { apiKey, defaultModel, searchApiKey, searchEngineID, streamedIO, enableMathjax, temperature, topP, topK } =
-    getPreferenceValues();
   generationConfig.temperature = parseFloat(temperature);
   generationConfig.topP = parseFloat(topP);
   generationConfig.topK = parseInt(topK);
@@ -46,28 +96,7 @@ export function useChat(props) {
   const rawAnswer = useRef("");
   const chatObject = useRef(null);
   const lastQuery = useRef(argQuery);
-  const suggestion = useRef(argQuery);
   const { push } = useNavigation();
-
-  const getSuggestion = async (text) => {
-    // TODO
-    suggestion.current = "text";
-    // const searchRegex = /Command:\s*?Search for (.+)$/;
-    // const match = text.match(searchRegex);
-    // if (match) {
-    //   const newRetrievalObjects = await getRetrieval(match[1], retrievalTypes.Google, searchApiKey, searchEngineID);
-    //   setMetadata(newRetrievalObjects);
-    //   suggestion.current = getExtraContext(newRetrievalObjects, false);
-    // }
-    // const readDocRegex = /Command:\s*?Full content of document (\d+)/;
-    // const match2 = text.match(readDocRegex);
-    // if (match2) {
-    //   const docID = parseInt(match2[1]);
-    //   if (docID >= 1 && docID <= metadata.length + 1) {
-    //     suggestion.current = (await retrieveByUrl(metadata[docID - 1].href, metadata[docID - 1].title, true)).content;
-    //   }
-    // }
-  };
 
   const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, shortQuery = "") => {
     lastQuery.current = query;
@@ -106,62 +135,84 @@ export function useChat(props) {
     const start = Date.now();
     try {
       var messageInfo = [query, ...retrievalObjects.map((o) => o.content)];
-      // continue with the chat context
-      if (chatObject.current) {
-        setLoading(true);
+      // get images ready
+      if (enable_vision) {
         await showToast({
           style: Toast.Style.Animated,
-          title: "Waiting for Gemini...",
+          title: "Preparing image...",
         });
-      } else {
-        if (enable_vision) {
-          await showToast({
-            style: Toast.Style.Animated,
-            title: "Preparing image...",
-          });
-          const { fileUrl, res: imagePart } = await pathOrURLToImage(argURL);
-          if (imagePart !== null) messageInfo.push(imagePart);
-          console.log(fileUrl);
-          const imageTemplate = `👤: \n\n\`\`\`\n${
-            shortQuery || query
-          }\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
-          historyText = imageTemplate;
-        }
-        // common behavior for all models
-        setMarkdown(historyText + "...");
-        setLoading(true);
-        await showToast({
-          style: Toast.Style.Animated,
-          title: "Waiting for Gemini...",
-        });
-
-        const model = genAI.getGenerativeModel({ model: defaultModel });
-        const chat = model.startChat({
-          history: historyJson,
-          generationConfig: generationConfig,
-          safetySettings: safetySettings,
-        });
-        chatObject.current = chat;
+        const { fileUrl, res: imagePart } = await pathOrURLToImage(argURL);
+        if (imagePart !== null) messageInfo.push(imagePart);
+        console.log(fileUrl);
+        const imageTemplate = `👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+        historyText = imageTemplate;
       }
+      // common behavior for all models
+      setMarkdown(historyText + "...");
+      setLoading(true);
+      await showToast({
+        style: Toast.Style.Animated,
+        title: "Waiting for Gemini...",
+      });
+
+      // TODO: for now, not allowed to enable function call & code execution at the same time
+      // disable codeExecution if function call is enabled historically
+      var tools = { codeExecution: {} };
+      if (retrievalType == retrievalTypes.Function || (historyJson.length > 0 && metadata.length > 0)) {
+        tools = {
+          functionDeclarations: [GoogleSearchFunctionDeclaration, GetFullContextFunctionDeclaration],
+        };
+      }
+      const model = genAI.getGenerativeModel({ model: defaultModel });
+      const chat = model.startChat({
+        history: historyJson,
+        generationConfig: generationConfig,
+        safetySettings: safetySettings,
+        tools: [tools],
+      });
+      chatObject.current = chat;
+
       var result;
-      if (streamedIO) {
-        result = await chatObject.current.sendMessageStream(messageInfo);
-      } else {
-        result = await chatObject.current.sendMessage(messageInfo);
-      }
-
-      // post process of response text
       var text = "";
-      if (streamedIO) {
+      // function call conflicts with streamedIO
+      if (retrievalType != retrievalTypes.Function) {
+        result = await chatObject.current.sendMessageStream(messageInfo);
+        // post process of response text
         for await (const chunk of result.stream) {
           const chunkText = chunk.text();
           text += chunkText;
           setMarkdown(historyText + text);
         }
       } else {
-        const response = await result.response;
-        text = response.text();
+        result = await chatObject.current.sendMessage(messageInfo);
+        // only the first call is executed
+        var calls = result.response.functionCalls();
+        while (calls && calls.length > 0 && calls[0]) {
+          const call = calls[0];
+          setMarkdown(historyText + `calling ${call.name} with args: ${JSON.stringify(call.args)}\n\n`);
+          const apiResponse = await apiFunctions[call.name](call.args);
+          if (call.name == "google") setMetadata(apiResponse);
+          // Indicating
+          await showToast({
+            style: Toast.Style.Animated,
+            title: "Thinking about the next step ...",
+          });
+          // auto reply with response
+          result = await chat.sendMessage([
+            {
+              functionResponse: {
+                name: call.name,
+                response: {
+                  docs: apiResponse,
+                },
+              },
+            },
+          ]);
+          calls = result.response.functionCalls();
+        }
+        text = result.response.text();
       }
+
       const history = await chatObject.current.getHistory();
       storedHistoryJson(history);
       rawAnswer.current = text;
@@ -176,7 +227,6 @@ export function useChat(props) {
         setMarkdown(historyText + newMarkdown);
       }
       // show success toast
-      await getSuggestion(text);
       setLoading(false);
       await showToast({
         style: Toast.Style.Success,
@@ -208,10 +258,9 @@ export function useChat(props) {
       markdown,
       metadata,
       rawAnswer,
-      suggestion,
       loading,
       getResponse,
     }),
-    [markdown, metadata, rawAnswer, suggestion, loading, getResponse],
+    [markdown, metadata, rawAnswer, loading, getResponse],
   );
 }
