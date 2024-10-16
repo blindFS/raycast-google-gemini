@@ -96,7 +96,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                       <Action.SubmitForm
                         onSubmit={(values) => {
                           if (values.replyText) {
-                            getResponse(values.replyText, vision);
+                            getResponse(values.replyText, vision, retrievalType);
                           } else {
                             showToast({
                               style: Toast.Style.Success,

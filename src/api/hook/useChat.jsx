@@ -108,7 +108,7 @@ export function useChat(props) {
 
     // empty metadata means it is the initial query
     var retrievalObjects = [];
-    if (retrievalType !== retrievalTypes.None && metadata.length == 0) {
+    if (retrievalType in [retrievalTypes.Google, retrievalTypes.URL] && metadata.length == 0) {
       try {
         retrievalObjects = await getRetrieval(
           fileManager,
@@ -136,7 +136,7 @@ export function useChat(props) {
     try {
       var messageInfo = [query, ...retrievalObjects.map((o) => o.content)];
       // get images ready
-      if (enable_vision) {
+      if (enable_vision && !chatObject.current) {
         await showToast({
           style: Toast.Style.Animated,
           title: "Preparing image...",

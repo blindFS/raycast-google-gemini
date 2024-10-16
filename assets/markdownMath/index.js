@@ -12,17 +12,18 @@ mjAPI.start();
 
 async function replaceEquationsWithImages(markdown, parser) {
   const tree = parser.parse(markdown);
-  const query = new Parser.Query(MarkDown.inline, '(latex_block (latex_span_delimiter) @delimiter) @math');
+  const query = new Parser.Query(MarkDown.inline, '(latex_block (latex_span_delimiter) @delimiter (latex_span_delimiter)) @math');
   const matches = query.matches(tree.rootNode);
   var res = markdown;
   const promises = [];
   const ranges = [];
   matches.reverse().forEach(match => {
-    const node = match.captures[0].node
+    const node = match.captures[0].node;
     ranges.push({ start: node.startIndex, end: node.endIndex });
     // delimiter's length == 1, means `$`, inline equation
-    const height = match.captures[1].node.text.length == 1 ? 16 : 48;
-    promises.push(Promise.resolve(generateMathJaxImage(node.text, height)));
+    const del_len= match.captures[1].node.text.length;
+    const height = del_len == 1? 16 : 48;
+    promises.push(Promise.resolve(generateMathJaxImage(node.text.slice(del_len, -del_len), height)));
   })
   const results = await Promise.all(promises);
   for (const result of results) {
