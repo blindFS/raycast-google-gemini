@@ -15,7 +15,7 @@ const getFullQuery = (query, context, examples) => {
 export default (props, context, vision = false, retrievalType = retrievalTypes.None, examples = "") => {
   const { query: argQuery } = props.arguments;
   const { push, pop } = useNavigation();
-  const { markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse } = useChat(props);
+  const { markdown, metadata, rawAnswer, suggestion, loading, getResponse } = useChat(props);
   const [query, setQuery] = useState(argQuery);
 
   useEffect(() => {
@@ -108,13 +108,6 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
                   />
                 </Form>,
               );
-            }}
-          />
-          <Action
-            title="View Extra Context"
-            icon={Icon.Document}
-            onAction={() => {
-              push(<Detail markdown={extraContext.current} />);
             }}
           />
           <Action.CopyToClipboard content={rawAnswer.current} shortcut={{ modifiers: ["cmd"], key: "c" }} />

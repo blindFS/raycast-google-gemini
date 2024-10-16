@@ -3,7 +3,6 @@ import { open, Icon, Alert, confirmAlert } from "@raycast/api";
 import { LocalStorage } from "@raycast/api";
 import { useEffect, useState } from "react";
 import { launchCommand, LaunchType } from "@raycast/api";
-import { getExtraContext } from "./api/utils";
 
 export default function History() {
   const [data, setData] = useState();
@@ -81,7 +80,6 @@ export default function History() {
                           markdown: dialogue.markdown,
                           metadata: dialogue.metadata,
                           history: dialogue.history,
-                          extraContext: getExtraContext(dialogue.metadata),
                         },
                       });
                     }}

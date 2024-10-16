@@ -229,6 +229,24 @@
       "type": "password"
     },
     {
+      "description": "Which model to use.",
+      "name": "defaultModel",
+      "title": "Model",
+      "type": "dropdown",
+      "required": false,
+      "default": "gemini-1.5-flash",
+      "data": [
+        {
+          "title": "Gemini 1.5 Pro",
+          "value": "gemini-1.5-pro"
+        },
+        {
+          "title": "Gemini 1.5 Flash",
+          "value": "gemini-1.5-flash"
+        }
+      ]
+    },
+    {
       "description": "Search API Key",
       "name": "searchApiKey",
       "required": false,
@@ -284,18 +302,16 @@
     }
   ],
   "dependencies": {
-    "@google/generative-ai": "^0.21.0",
-    "@raycast/api": "^1.56.0",
-    "@raycast/utils": "^1.9.0",
-    "cheerio": "^1.0.0",
-    "file-type": "^18.7.0",
-    "html-to-text": "^9.0.5",
-    "node-fetch": "^3.3.2"
+    "@google/generative-ai": "latest",
+    "@raycast/api": "latest",
+    "cheerio": "latest",
+    "file-type": "latest",
+    "node-fetch": "latest"
   },
   "devDependencies": {
     "@raycast/eslint-config": "latest",
-    "@types/node": "20.10.5",
-    "@types/react": "18.2.45",
+    "@types/node": "latest",
+    "@types/react": "latest",
     "eslint": "latest",
     "is-binary-path": "latest",
     "prettier": "latest",

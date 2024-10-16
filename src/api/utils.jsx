@@ -2,7 +2,6 @@ import { Clipboard } from "@raycast/api";
 import { execSync } from "child_process";
 import { fileTypeFromBuffer, fileTypeFromFile } from "file-type";
 import { setTimeout } from "timers";
-import { convert } from "html-to-text";
 import { assert } from "console";
 import { Toast, showToast } from "@raycast/api";
 import * as cheerio from "cheerio";
@@ -11,7 +10,35 @@ import url from "url";
 import fs from "fs";
 import path from "path";
 
-export async function parseLink(pathOrURL = "") {
+async function requestWithToast(closure, message, loading_banner, success_banner) {
+  showToast({
+    style: Toast.Style.Animated,
+    title: loading_banner,
+    message: message,
+  });
+  const result = await closure();
+  showToast({
+    style: Toast.Style.Success,
+    title: success_banner,
+  });
+  return result;
+}
+
+export async function pathOrURLToImage(pathOrURL = "") {
+  const { fileUrl, filePath } = await parseLink(pathOrURL);
+  var res = null;
+  if (filePath) {
+    res = await pathToGenerativePart(filePath, "image/png");
+  } else {
+    res = await urlToGenerativePart(fileUrl);
+  }
+  return {
+    fileUrl,
+    res,
+  };
+}
+
+async function parseLink(pathOrURL = "") {
   var fileUrl = "";
   var filePath = "";
   try {
@@ -43,54 +70,64 @@ export async function parseLink(pathOrURL = "") {
   };
 }
 
-export async function retrieveByUrl(urlText = "", title = "", cleanBody = false, truncationLength = "50000") {
+async function retrieveByUrl(fileManager, urlText = "") {
   const { fileUrl, filePath } = await parseLink(urlText);
   if (filePath !== "") {
-    console.log(filePath);
     const isText = !isBinaryPath(filePath);
-    console.log(isText);
     if (isText) {
-      return { href: filePath, title: path.basename(filePath), content: fs.readFileSync(filePath, "utf8") };
+      return {
+        href: filePath,
+        title: path.basename(filePath),
+        content: await pathToGenerativePart(filePath, "text/plain"),
+      };
     }
     const fType = await fileTypeFromFile(filePath);
     const mime = fType.mime || "unknown";
-    // if (mime == "application/pdf") {
-    // TODO handle PDF extract
-    // } else {
-    throw new Error(`FileType ${mime} is currently not supported in this mode.`);
-    // }
-  }
-  showToast({
-    style: Toast.Style.Animated,
-    title: "Extracting context from the URL in clipboard",
-    message: fileUrl,
-  });
-  const controller = new AbortController();
-  setTimeout(() => {
-    controller.abort();
-  }, 5000);
-  const response = await fetch(fileUrl, { signal: controller.signal });
-  const rawHTML = await response.text();
-  showToast({
-    style: Toast.Style.Success,
-    title: "Content extraction successful",
-  });
-  var body = "";
-  if (cleanBody) {
-    const $ = cheerio.load(rawHTML);
-    title = title || $("title").text();
-    body = $("body").text();
-  } else {
-    body = convert(rawHTML, { wordwrap: 130 });
-    if (!title) {
-      const $ = cheerio.load(rawHTML);
-      title = $("title").text();
+    if (mime == "application/pdf") {
+      const uploadResponse = await requestWithToast(
+        async () => {
+          return await fileManager.uploadFile(filePath, {
+            mimeType: mime,
+            displayName: path.basename(filePath),
+          });
+        },
+        filePath,
+        "Uploading PDF file ...",
+        "PDF file upload successful",
+      );
+      return {
+        href: filePath,
+        title: path.basename(filePath),
+        content: {
+          fileData: {
+            mimeType: uploadResponse.file.mimeType,
+            fileUri: uploadResponse.file.uri,
+          },
+        },
+      };
+    } else {
+      throw new Error(`FileType ${mime} is currently not supported in this mode.`);
     }
   }
+  const rawHTML = await requestWithToast(
+    async () => {
+      const controller = new AbortController();
+      setTimeout(() => {
+        controller.abort();
+      }, 5000);
+      const response = await fetch(fileUrl, { signal: controller.signal });
+      return await response.text();
+    },
+    fileUrl,
+    "Extracting context from the URL in clipboard",
+    "Content extraction successful",
+  );
+
+  const $ = cheerio.load(rawHTML);
   return {
     href: fileUrl,
-    title: title,
-    content: body.slice(0, truncationLength),
+    title: $("title").text(),
+    content: bufferToGenerativePart(rawHTML, "text/html"),
   };
 }
 
@@ -101,6 +138,7 @@ export const retrievalTypes = {
 };
 
 export async function getRetrieval(
+  fileManager,
   searchQuery,
   retrievalType,
   searchApiKey = "",
@@ -110,7 +148,7 @@ export async function getRetrieval(
 ) {
   var retrievalObjects = [];
   if (retrievalType == retrievalTypes.URL) {
-    const retrievalObject = await retrieveByUrl(URL);
+    const retrievalObject = await retrieveByUrl(fileManager, URL);
     if (retrievalObject) retrievalObjects.push(retrievalObject);
   } else if (retrievalType == retrievalTypes.Google) {
     const googleSearchUrl = "https://www.googleapis.com/customsearch/v1?";
@@ -123,22 +161,20 @@ export async function getRetrieval(
     setTimeout(() => {
       controller.abort();
     }, 5000);
-    showToast({
-      style: Toast.Style.Animated,
-      title: "Google Searching",
-      message: "query: " + searchQuery,
-    });
-    const response = await fetch(googleSearchUrl + new URLSearchParams(params), { signal: controller.signal });
-    const json = await response.json();
-    showToast({
-      style: Toast.Style.Success,
-      title: "Got google top results",
-    });
+    const json = await requestWithToast(
+      async () => {
+        const response = await fetch(googleSearchUrl + new URLSearchParams(params), { signal: controller.signal });
+        return await response.json();
+      },
+      "query: " + searchQuery,
+      "Google Searching",
+      "Got google top results",
+    );
     for (const item of json.items.slice(0, topN)) {
       retrievalObjects.push({
         href: item.link,
         title: item.title,
-        content: item.snippet,
+        content: bufferToGenerativePart(item.snippet, "text/plain"),
       });
     }
   }
@@ -155,46 +191,28 @@ export function executeShellCommand(command) {
   }
 }
 
-// Converts local file information to a GoogleGenerativeAI.Part object.
-export async function pathToGenerativePart(path, mimeType) {
+function bufferToGenerativePart(buffer, mimeType) {
   return {
     inlineData: {
-      data: Buffer.from(fs.readFileSync(path)).toString("base64"),
+      data: Buffer.from(buffer).toString("base64"),
       mimeType,
     },
   };
 }
 
-export async function urlToGenerativePart(fileUrl) {
+// Converts local file information to a GoogleGenerativeAI.Part object.
+async function pathToGenerativePart(path, mimeType) {
+  return bufferToGenerativePart(await fs.promises.readFile(path), mimeType);
+}
+
+async function urlToGenerativePart(fileUrl) {
   try {
     const response = await fetch(fileUrl);
     const arrayBuffer = await response.arrayBuffer();
     const fileType = await fileTypeFromBuffer(arrayBuffer);
     const mimeType = fileType.mime;
-    return {
-      inlineData: {
-        data: Buffer.from(arrayBuffer).toString("base64"),
-        mimeType,
-      },
-    };
+    return bufferToGenerativePart(arrayBuffer, mimeType);
   } catch (e) {
     throw new Error("Image download failed: " + e.message);
   }
-}
-
-export function getExtraContext(retrievalObjects, markdown = true) {
-  const header = markdown ? "\n\n====================\n\n" : "";
-  const separator = markdown ? " ----------------------- \n\n" : "";
-  const decorator = markdown ? "**" : "";
-  return retrievalObjects.length > 0
-    ? header +
-        retrievalObjects
-          .map(
-            (retrievalObject, index) =>
-              `${decorator}Title ${index + 1}${decorator}: ${retrievalObject.title}\n\n${decorator}Body ${
-                index + 1
-              }${decorator}: ${retrievalObject.content.slice(0, 20000)}\n\n`,
-          )
-          .join(separator)
-    : "";
 }

@@ -4,17 +4,13 @@ import { getPreferenceValues } from "@raycast/api";
 import { LocalStorage } from "@raycast/api";
 import { resolve } from "path";
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
+import { GoogleAIFileManager } from "@google/generative-ai/server";
 import fs from "fs";
-import {
-  retrievalTypes,
-  retrieveByUrl,
-  getRetrieval,
-  getExtraContext,
-  executeShellCommand,
-  pathToGenerativePart,
-  urlToGenerativePart,
-  parseLink,
-} from "../utils";
+import fetch, { Headers } from "node-fetch";
+globalThis.fetch = fetch;
+globalThis.Headers = Headers;
+
+import { retrievalTypes, getRetrieval, executeShellCommand, pathOrURLToImage } from "../utils";
 
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 const safetySettings = [];
@@ -37,7 +33,7 @@ export function useChat(props) {
   argGoogle = argGoogle || argQuery;
   argURL = argURL || "";
   const context = props.launchContext || {};
-  const { apiKey, searchApiKey, searchEngineID, streamedIO, enableMathjax, temperature, topP, topK } =
+  const { apiKey, defaultModel, searchApiKey, searchEngineID, streamedIO, enableMathjax, temperature, topP, topK } =
     getPreferenceValues();
   generationConfig.temperature = parseFloat(temperature);
   generationConfig.topP = parseFloat(topP);
@@ -46,7 +42,6 @@ export function useChat(props) {
   const [metadata, setMetadata] = useState(context.metadata || []);
   const [loading, setLoading] = useState(false);
   const [historyJson, storedHistoryJson] = useState(context.history || []);
-  const extraContext = useRef(context.extraContext || "");
   const chatID = useRef(context.chatID || Date.now().toString());
   const rawAnswer = useRef("");
   const chatObject = useRef(null);
@@ -55,22 +50,23 @@ export function useChat(props) {
   const { push } = useNavigation();
 
   const getSuggestion = async (text) => {
-    suggestion.current = "";
-    const searchRegex = /Command:\s*?Search for (.+)$/;
-    const match = text.match(searchRegex);
-    if (match) {
-      const newRetrievalObjects = await getRetrieval(match[1], retrievalTypes.Google, searchApiKey, searchEngineID);
-      setMetadata(newRetrievalObjects);
-      suggestion.current = getExtraContext(newRetrievalObjects, false);
-    }
-    const readDocRegex = /Command:\s*?Full content of document (\d+)/;
-    const match2 = text.match(readDocRegex);
-    if (match2) {
-      const docID = parseInt(match2[1]);
-      if (docID >= 1 && docID <= metadata.length + 1) {
-        suggestion.current = (await retrieveByUrl(metadata[docID - 1].href, metadata[docID - 1].title, true)).content;
-      }
-    }
+    // TODO
+    suggestion.current = "text";
+    // const searchRegex = /Command:\s*?Search for (.+)$/;
+    // const match = text.match(searchRegex);
+    // if (match) {
+    //   const newRetrievalObjects = await getRetrieval(match[1], retrievalTypes.Google, searchApiKey, searchEngineID);
+    //   setMetadata(newRetrievalObjects);
+    //   suggestion.current = getExtraContext(newRetrievalObjects, false);
+    // }
+    // const readDocRegex = /Command:\s*?Full content of document (\d+)/;
+    // const match2 = text.match(readDocRegex);
+    // if (match2) {
+    //   const docID = parseInt(match2[1]);
+    //   if (docID >= 1 && docID <= metadata.length + 1) {
+    //     suggestion.current = (await retrieveByUrl(metadata[docID - 1].href, metadata[docID - 1].title, true)).content;
+    //   }
+    // }
   };
 
   const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, shortQuery = "") => {
@@ -78,11 +74,21 @@ export function useChat(props) {
     const textTemplate = `\n\n👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
     setMarkdown(historyText + "...");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const fileManager = new GoogleAIFileManager(apiKey);
+
+    // empty metadata means it is the initial query
     var retrievalObjects = [];
-    // empty extraContext means it is the initial query
-    if (!extraContext.current) {
+    if (retrievalType !== retrievalTypes.None && metadata.length == 0) {
       try {
-        retrievalObjects = await getRetrieval(argGoogle, retrievalType, searchApiKey, searchEngineID, argURL);
+        retrievalObjects = await getRetrieval(
+          fileManager,
+          argGoogle,
+          retrievalType,
+          searchApiKey,
+          searchEngineID,
+          argURL,
+        );
       } catch (e) {
         console.error(e);
         push(<Detail markdown={e.message} />);
@@ -94,16 +100,12 @@ export function useChat(props) {
         return null;
       }
     }
-    // extraContext is to long to show in markdown
     if (retrievalObjects.length > 0) {
       setMetadata(retrievalObjects);
-      extraContext.current = getExtraContext(retrievalObjects);
-      query += extraContext.current;
     }
-    const genAI = new GoogleGenerativeAI(apiKey);
     const start = Date.now();
     try {
-      var messageInfo = query;
+      var messageInfo = [query, ...retrievalObjects.map((o) => o.content)];
       // continue with the chat context
       if (chatObject.current) {
         setLoading(true);
@@ -112,17 +114,13 @@ export function useChat(props) {
           title: "Waiting for Gemini...",
         });
       } else {
-        var model_name = "gemini-1.5-flash";
-        var imagePart = null;
         if (enable_vision) {
-          const { fileUrl, filePath } = await parseLink(argURL);
-          if (filePath) {
-            const mime = "image/png";
-            imagePart = pathToGenerativePart(filePath, mime);
-          } else {
-            imagePart = urlToGenerativePart(fileUrl);
-          }
-
+          await showToast({
+            style: Toast.Style.Animated,
+            title: "Preparing image...",
+          });
+          const { fileUrl, res: imagePart } = await pathOrURLToImage(argURL);
+          if (imagePart !== null) messageInfo.push(imagePart);
           console.log(fileUrl);
           const imageTemplate = `👤: \n\n\`\`\`\n${
             shortQuery || query
@@ -134,15 +132,10 @@ export function useChat(props) {
         setLoading(true);
         await showToast({
           style: Toast.Style.Animated,
-          title: "Preparing image...",
-        });
-        messageInfo = imagePart ? [query, await imagePart] : query;
-        await showToast({
-          style: Toast.Style.Animated,
           title: "Waiting for Gemini...",
         });
 
-        const model = genAI.getGenerativeModel({ model: model_name });
+        const model = genAI.getGenerativeModel({ model: defaultModel });
         const chat = model.startChat({
           history: historyJson,
           generationConfig: generationConfig,
@@ -216,10 +209,9 @@ export function useChat(props) {
       metadata,
       rawAnswer,
       suggestion,
-      extraContext,
       loading,
       getResponse,
     }),
-    [markdown, metadata, rawAnswer, suggestion, extraContext, loading, getResponse],
+    [markdown, metadata, rawAnswer, suggestion, loading, getResponse],
   );
 }
