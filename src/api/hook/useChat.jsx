@@ -47,7 +47,7 @@ const generationConfig = {
   topK: 1,
 };
 
-const GoogleSearchFunctionDeclaration = {
+const googleSearchFunctionDeclaration = {
   name: "google",
   parameters: {
     type: "OBJECT",
@@ -66,7 +66,7 @@ const GoogleSearchFunctionDeclaration = {
   },
 };
 
-const GetFullContextFunctionDeclaration = {
+const getFullContextFunctionDeclaration = {
   name: "getFullContext",
   parameters: {
     type: "OBJECT",
@@ -147,9 +147,9 @@ export function useChat(props) {
     executeShellCommand(appleScript);
   }
 
-  const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, shortQuery = "") => {
+  const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, displayQuery = "") => {
     lastQuery.current = query;
-    const textTemplate = `\n\n👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n 🤖: \n\n`;
+    const textTemplate = `\n\n👤: \n\n\`\`\`\n${displayQuery || query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
     setMarkdownAndScroll(historyText + "...");
     const genAI = new GoogleGenerativeAI(apiKey);
@@ -178,7 +178,7 @@ export function useChat(props) {
           content: imagePart,
         })
         console.log(fileUrl);
-        const imageTemplate = `👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
+        const imageTemplate = `👤: \n\n\`\`\`\n${displayQuery || query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
         historyText = imageTemplate;
       }
       // get attachments ready
@@ -197,15 +197,17 @@ export function useChat(props) {
       var tools = enableCodeExecution ? { codeExecution: {} } : {};
       if (retrievalType == retrievalTypes.Function || (historyJson.length > 0 && metadata.length > 0)) {
         tools = {
-          functionDeclarations: [GoogleSearchFunctionDeclaration, GetFullContextFunctionDeclaration],
+          functionDeclarations: [googleSearchFunctionDeclaration, getFullContextFunctionDeclaration],
         };
       }
-      const model = genAI.getGenerativeModel({ model: defaultModel });
-      const chat = model.startChat({
-        history: historyJson,
+      const model = genAI.getGenerativeModel({
+        model: defaultModel,
         generationConfig: generationConfig,
         safetySettings: safetySettings,
         tools: [tools],
+      });
+      const chat = model.startChat({
+        history: historyJson,
       });
 
       var result;
@@ -280,7 +282,7 @@ export function useChat(props) {
       setLoading(false);
       handleErrorWithRetry(
         e,
-        () => getResponse(query, enable_vision, retrievalType, shortQuery),
+        () => getResponse(query, enable_vision, retrievalType, displayQuery),
         "No response from Gemini",
       )
     }
