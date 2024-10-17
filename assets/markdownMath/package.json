@@ -1,5 +1,6 @@
 {
 	"name": "markdown_mathjax",
+  "type": "module",
 	"version": "1.0.0",
 	"description": "replace math equations in markwon with mathjax rendered svg images",
 	"main": "index.js",

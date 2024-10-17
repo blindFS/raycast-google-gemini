@@ -114,7 +114,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
               );
             }}
           />
-          <Action.CopyToClipboard content={rawAnswer.current} shortcut={{ modifiers: ["cmd"], key: "c" }} />
+          <Action.CopyToClipboard content={rawAnswer.current} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
         </ActionPanel>
       }
     ></Detail>

@@ -24,17 +24,24 @@ async function requestWithToast(closure, message, loading_banner, success_banner
 }
 
 export async function pathOrURLToImage(pathOrURL = "") {
-  const { fileUrl, filePath } = await parseLink(pathOrURL);
-  var res = null;
-  if (filePath) {
-    res = await pathToGenerativePart(filePath, "image/png");
-  } else {
-    res = await urlToGenerativePart(fileUrl);
-  }
-  return {
-    fileUrl,
-    res,
-  };
+  return await requestWithToast(
+    async () => {
+      const { fileUrl, filePath } = await parseLink(pathOrURL);
+      var res = null;
+      if (filePath) {
+        res = await pathToGenerativePart(filePath, "image/png");
+      } else {
+        res = await urlToGenerativePart(fileUrl);
+      }
+      return {
+        fileUrl,
+        res,
+      };
+    },
+    pathOrURL,
+    "Preparing image...",
+    "Image loaded.",
+  );
 }
 
 async function parseLink(pathOrURL = "") {
@@ -163,6 +170,9 @@ export async function GoogleSearch(searchQuery, searchApiKey = "", searchEngineI
     "Google Searching",
     "Got google top results",
   );
+  if (!json || !json.items) {
+    return [];
+  }
   return json.items.slice(0, topN).map((item) => {
     return {
       href: item.link,

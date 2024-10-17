@@ -84,7 +84,7 @@ export default function History() {
                       });
                     }}
                   />
-                  <Action.CopyToClipboard content={dialogue.markdown} shortcut={{ modifiers: ["cmd"], key: "c" }} />
+                  <Action.CopyToClipboard content={dialogue.markdown} shortcut={{ modifiers: ["cmd", "shift"], key: "c" }} />
                   <Action
                     style={Action.Style.Destructive}
                     icon={Icon.Trash}

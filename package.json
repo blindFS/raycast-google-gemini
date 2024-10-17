@@ -261,11 +261,19 @@
       "type": "textfield"
     },
     {
-      "description": "Whether to use mathjax-node to post-render math equations",
+      "description": "Whether to use mathjax-node to post-render math equations.",
       "name": "enableMathjax",
-      "label": "Whether to use mathjax-node to post-render math equations",
+      "label": "Use mathjax-node for math equations",
       "required": false,
       "title": "Enable mathjax",
+      "type": "checkbox"
+    },
+    {
+      "description": "Whether to enable code execution during the chat.",
+      "name": "enableCodeExecution",
+      "label": "Enable code execution",
+      "required": false,
+      "title": "Enable code execution",
       "type": "checkbox"
     },
     {
@@ -315,6 +323,6 @@
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
     "publish": "npx @raycast/api@latest publish",
-    "postinstall": "cd assets/markdownMath && npm install"
+    "postinstall": "npm --prefix assets/markdownMath install"
   }
 }

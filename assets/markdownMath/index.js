@@ -1,7 +1,7 @@
-const fs = require("fs");
-var mjAPI = require("mathjax-node");
-const Parser = require('tree-sitter');
-const MarkDown = require('@tree-sitter-grammars/tree-sitter-markdown');
+import MarkDown from '@tree-sitter-grammars/tree-sitter-markdown';
+import fs from "fs";
+import mjAPI from "mathjax-node";
+import Parser from 'tree-sitter';
 
 mjAPI.config({
   MathJax: {
@@ -21,9 +21,8 @@ async function replaceEquationsWithImages(markdown, parser) {
     const node = match.captures[0].node;
     ranges.push({ start: node.startIndex, end: node.endIndex });
     // delimiter's length == 1, means `$`, inline equation
-    const del_len= match.captures[1].node.text.length;
-    const height = del_len == 1? 16 : 48;
-    promises.push(Promise.resolve(generateMathJaxImage(node.text.slice(del_len, -del_len), height)));
+    const del_len = match.captures[1].node.text.length;
+    promises.push(Promise.resolve(generateMathJaxImage(node.text.slice(del_len, -del_len), del_len == 1)));
   })
   const results = await Promise.all(promises);
   for (const result of results) {
@@ -33,7 +32,9 @@ async function replaceEquationsWithImages(markdown, parser) {
   return res;
 }
 
-async function generateMathJaxImage(equation, height) {
+async function generateMathJaxImage(equation, inline = false) {
+  const height = inline ? 24 : 48;
+  const newline_or_empty = inline ? "" : "\n";
   return new Promise((resolve, reject) => {
     mjAPI.typeset(
       {
@@ -44,9 +45,9 @@ async function generateMathJaxImage(equation, height) {
       (data) => {
         if (data.svg) {
           resolve(
-            `![equation](data:image/svg+xml;base64,${Buffer.from(data.svg).toString(
+            `${newline_or_empty}![equation](data:image/svg+xml;base64,${Buffer.from(data.svg).toString(
               "base64"
-            )}?raycast-height=${height})`
+            )}?raycast-height=${height})${newline_or_empty}`
           );
         } else {
           reject("Failed to generate MathJax image");

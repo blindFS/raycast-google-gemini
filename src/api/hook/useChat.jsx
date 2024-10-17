@@ -1,13 +1,24 @@
 import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
-import { Detail, environment, getPreferenceValues, LocalStorage, showToast, Toast, useNavigation } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Detail,
+  environment,
+  getPreferenceValues,
+  Icon,
+  LocalStorage,
+  showToast,
+  Toast,
+  useNavigation,
+} from "@raycast/api";
 import fs from "fs";
 import fetch, { Headers } from "node-fetch";
-import { resolve } from "path";
-import { useEffect, useMemo, useRef, useState } from "react";
 globalThis.fetch = fetch;
 globalThis.Headers = Headers;
 
+import { resolve } from "path";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   executeShellCommand,
   getRetrieval,
@@ -17,8 +28,11 @@ import {
   retrievalTypes,
 } from "../utils";
 
-const { apiKey, defaultModel, searchApiKey, searchEngineID, enableMathjax, temperature, topP, topK } =
-  getPreferenceValues();
+const {
+  apiKey, defaultModel, searchApiKey, searchEngineID,
+  enableMathjax, enableCodeExecution, temperature, topP, topK
+} = getPreferenceValues();
+
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
 const safetySettings = [];
 for (const category of Object.keys(HarmCategory)) {
@@ -88,28 +102,64 @@ export function useChat(props) {
   generationConfig.temperature = parseFloat(temperature);
   generationConfig.topP = parseFloat(topP);
   generationConfig.topK = parseInt(topK);
+  const { push, pop } = useNavigation();
   const [markdown, setMarkdown] = useState(context.markdown || "");
   const [metadata, setMetadata] = useState(context.metadata || []);
   const [loading, setLoading] = useState(false);
   const [historyJson, storedHistoryJson] = useState(context.history || []);
   const chatID = useRef(context.chatID || Date.now().toString());
   const rawAnswer = useRef("");
-  const chatObject = useRef(null);
   const lastQuery = useRef(argQuery);
-  const { push } = useNavigation();
+
+  async function handleErrorWithRetry(
+    error,
+    retryClosure,
+    toastMessage
+  ) {
+    console.error(error);
+    push(
+      <Detail markdown={error.message}
+        // action for retry
+        actions={
+          <ActionPanel>
+            <Action
+              title="Retry"
+              icon={Icon.Reply}
+              onAction={
+                () => {
+                  pop();
+                  retryClosure();
+                }
+              } />
+          </ActionPanel>}
+      />);
+    await showToast({
+      style: Toast.Style.Failure,
+      title: toastMessage,
+      message: error.message,
+    });
+  }
+
+  // press pagedown
+  const appleScript = `osascript -e 'tell application "System Events" to key code 121'`;
+  function setMarkdownAndScroll(markdown) {
+    setMarkdown(markdown);
+    executeShellCommand(appleScript);
+  }
 
   const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, shortQuery = "") => {
     lastQuery.current = query;
     const textTemplate = `\n\n👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
-    setMarkdown(historyText + "...");
+    setMarkdownAndScroll(historyText + "...");
     const genAI = new GoogleGenerativeAI(apiKey);
     const fileManager = new GoogleAIFileManager(apiKey);
 
-    // empty metadata means it is the initial query
-    var retrievalObjects = [];
-    if (retrievalType in [retrievalTypes.Google, retrievalTypes.URL] && metadata.length == 0) {
-      try {
+    const start = Date.now();
+    try {
+      // retrieval first, no repeat if metadata not empty
+      var retrievalObjects = [];
+      if ([retrievalTypes.Google, retrievalTypes.URL].includes(retrievalType) && metadata.length == 0) {
         retrievalObjects = await getRetrieval(
           fileManager,
           argGoogle,
@@ -118,37 +168,24 @@ export function useChat(props) {
           searchEngineID,
           argURL,
         );
-      } catch (e) {
-        console.error(e);
-        push(<Detail markdown={e.message} />);
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Failed to retrieve content",
-          message: e.message,
-        });
-        return null;
       }
-    }
-    if (retrievalObjects.length > 0) {
-      setMetadata(retrievalObjects);
-    }
-    const start = Date.now();
-    try {
-      var messageInfo = [query, ...retrievalObjects.map((o) => o.content)];
-      // get images ready
-      if (enable_vision && !chatObject.current) {
-        await showToast({
-          style: Toast.Style.Animated,
-          title: "Preparing image...",
-        });
+      // get images ready, if metadata not empty, no need to repeat
+      if (enable_vision && metadata.length == 0) {
         const { fileUrl, res: imagePart } = await pathOrURLToImage(argURL);
-        if (imagePart !== null) messageInfo.push(imagePart);
+        retrievalObjects.push({
+          href: fileUrl,
+          title: "image",
+          content: imagePart,
+        })
         console.log(fileUrl);
         const imageTemplate = `👤: \n\n\`\`\`\n${shortQuery || query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
         historyText = imageTemplate;
       }
-      // common behavior for all models
-      setMarkdown(historyText + "...");
+      // get attachments ready
+      if (retrievalObjects.length > 0) setMetadata(retrievalObjects);
+      const messageInfo = [query, ...retrievalObjects.map((o) => o.content)];
+      // begin chat
+      setMarkdownAndScroll(historyText + "...");
       setLoading(true);
       await showToast({
         style: Toast.Style.Animated,
@@ -157,7 +194,7 @@ export function useChat(props) {
 
       // TODO: for now, not allowed to enable function call & code execution at the same time
       // disable codeExecution if function call is enabled historically
-      var tools = { codeExecution: {} };
+      var tools = enableCodeExecution ? { codeExecution: {} } : {};
       if (retrievalType == retrievalTypes.Function || (historyJson.length > 0 && metadata.length > 0)) {
         tools = {
           functionDeclarations: [GoogleSearchFunctionDeclaration, GetFullContextFunctionDeclaration],
@@ -170,26 +207,32 @@ export function useChat(props) {
         safetySettings: safetySettings,
         tools: [tools],
       });
-      chatObject.current = chat;
 
       var result;
       var text = "";
       // function call conflicts with streamedIO
       if (retrievalType != retrievalTypes.Function) {
-        result = await chatObject.current.sendMessageStream(messageInfo);
+        result = await chat.sendMessageStream(messageInfo);
         // post process of response text
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
-          text += chunkText;
-          setMarkdown(historyText + text);
+        // TODO: workaround (try catch) for stream parsing bug with code execution
+        try {
+          for await (const chunk of result.stream) {
+            const chunkText = chunk.text();
+            text += chunkText;
+            setMarkdownAndScroll(historyText + text);
+            executeShellCommand(appleScript);
+          }
+        } catch (e) {
+          console.error(e);
         }
       } else {
-        result = await chatObject.current.sendMessage(messageInfo);
+        result = await chat.sendMessage(messageInfo);
         // only the first call is executed
         var calls = result.response.functionCalls();
         while (calls && calls.length > 0 && calls[0]) {
           const call = calls[0];
-          setMarkdown(historyText + `calling ${call.name} with args: ${JSON.stringify(call.args)}\n\n`);
+          setMarkdownAndScroll(historyText +
+            `calling \`${call.name}\` with args:\n \`\`\`js\n${JSON.stringify(call.args)}\n\`\`\`\n`);
           const apiResponse = await apiFunctions[call.name](call.args);
           if (call.name == "google") setMetadata(apiResponse);
           // Indicating
@@ -212,19 +255,19 @@ export function useChat(props) {
         }
         text = result.response.text();
       }
-
-      const history = await chatObject.current.getHistory();
+      // post process of response text
+      const history = await chat.getHistory();
       storedHistoryJson(history);
       rawAnswer.current = text;
-      setMarkdown(historyText + text);
+      setMarkdownAndScroll(historyText + text);
+      // mathjax equation replacing
       if (enableMathjax) {
         fs.writeFileSync(DOWNLOAD_PATH, text);
         console.log("New response saved to " + DOWNLOAD_PATH);
         // replace equations with images
         const scriptPath = resolve(environment.assetsPath, "markdownMath", "index.js");
-        const commandString = `node ${scriptPath} "${DOWNLOAD_PATH}"`;
-        const newMarkdown = executeShellCommand(commandString);
-        setMarkdown(historyText + newMarkdown);
+        const newMarkdown = executeShellCommand(`node ${scriptPath} "${DOWNLOAD_PATH}"`);
+        setMarkdownAndScroll(historyText + newMarkdown);
       }
       // show success toast
       setLoading(false);
@@ -234,14 +277,12 @@ export function useChat(props) {
         message: `Load finished in ${(Date.now() - start) / 1000} seconds.`,
       });
     } catch (e) {
-      console.error(e);
       setLoading(false);
-      push(<Detail markdown={e.message} />);
-      await showToast({
-        style: Toast.Style.Failure,
-        title: "Response Failed",
-        message: e.message,
-      });
+      handleErrorWithRetry(
+        e,
+        () => getResponse(query, enable_vision, retrievalType, shortQuery),
+        "No response from Gemini",
+      )
     }
   };
 
