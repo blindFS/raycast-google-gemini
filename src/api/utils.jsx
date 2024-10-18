@@ -87,7 +87,7 @@ export async function rawHTMLByURL(url) {
       return await response.text();
     },
     url,
-    "Extracting context from the URL in clipboard",
+    "Extracting context from the URL...",
     "Content extraction successful",
   );
   const $ = cheerio.load(rawHTML);
