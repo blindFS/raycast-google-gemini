@@ -142,16 +142,19 @@ export function useChat(props) {
 
   // press pagedown
   const appleScript = `osascript -e 'tell application "System Events" to key code 121'`;
-  function setMarkdownAndScroll(markdown) {
-    setMarkdown(markdown);
-    executeShellCommand(appleScript);
-  }
+  // scroll down whenever chat context changes
+  useEffect(() => {
+    // sleep 200ms first
+    setTimeout(() => {
+      executeShellCommand(appleScript);
+    }, 200);
+  }, [markdown]);
 
   const getResponse = async (query, enable_vision = false, retrievalType = retrievalTypes.None, displayQuery = "") => {
     lastQuery.current = query;
     const textTemplate = `\n\n👤: \n\n\`\`\`\n${displayQuery || query}\n\`\`\` \n\n 🤖: \n\n`;
     var historyText = markdown + textTemplate;
-    setMarkdownAndScroll(historyText + "...");
+    setMarkdown(historyText + "...");
     const genAI = new GoogleGenerativeAI(apiKey);
     const fileManager = new GoogleAIFileManager(apiKey);
 
@@ -185,7 +188,7 @@ export function useChat(props) {
       if (retrievalObjects.length > 0) setMetadata(retrievalObjects);
       const messageInfo = [query, ...retrievalObjects.map((o) => o.content)];
       // begin chat
-      setMarkdownAndScroll(historyText + "...");
+      setMarkdown(historyText + "...");
       setLoading(true);
       await showToast({
         style: Toast.Style.Animated,
@@ -221,7 +224,7 @@ export function useChat(props) {
           for await (const chunk of result.stream) {
             const chunkText = chunk.text();
             text += chunkText;
-            setMarkdownAndScroll(historyText + text);
+            setMarkdown(historyText + text);
             executeShellCommand(appleScript);
           }
         } catch (e) {
@@ -233,7 +236,7 @@ export function useChat(props) {
         var calls = result.response.functionCalls();
         while (calls && calls.length > 0 && calls[0]) {
           const call = calls[0];
-          setMarkdownAndScroll(historyText +
+          setMarkdown(historyText +
             `calling \`${call.name}\` with args:\n \`\`\`js\n${JSON.stringify(call.args)}\n\`\`\`\n`);
           const apiResponse = await apiFunctions[call.name](call.args);
           if (call.name == "google") setMetadata(apiResponse);
@@ -261,7 +264,7 @@ export function useChat(props) {
       const history = await chat.getHistory();
       storedHistoryJson(history);
       rawAnswer.current = text;
-      setMarkdownAndScroll(historyText + text);
+      setMarkdown(historyText + text);
       // mathjax equation replacing
       if (enableMathjax) {
         fs.writeFileSync(DOWNLOAD_PATH, text);
@@ -269,7 +272,7 @@ export function useChat(props) {
         // replace equations with images
         const scriptPath = resolve(environment.assetsPath, "markdownMath", "index.js");
         const newMarkdown = executeShellCommand(`node ${scriptPath} "${DOWNLOAD_PATH}"`);
-        setMarkdownAndScroll(historyText + newMarkdown);
+        setMarkdown(historyText + newMarkdown);
       }
       // show success toast
       setLoading(false);
