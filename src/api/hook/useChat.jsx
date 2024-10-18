@@ -29,8 +29,15 @@ import {
 } from "../utils";
 
 const {
-  apiKey, defaultModel, searchApiKey, searchEngineID,
-  enableMathjax, enableCodeExecution, temperature, topP, topK
+  apiKey,
+  defaultModel,
+  searchApiKey,
+  searchEngineID,
+  enableMathjax,
+  enableCodeExecution,
+  temperature,
+  topP,
+  topK,
 } = getPreferenceValues();
 
 const DOWNLOAD_PATH = resolve(environment.supportPath, "response.md");
@@ -111,28 +118,26 @@ export function useChat(props) {
   const rawAnswer = useRef("");
   const lastQuery = useRef(argQuery);
 
-  async function handleErrorWithRetry(
-    error,
-    retryClosure,
-    toastMessage
-  ) {
+  async function handleErrorWithRetry(error, retryClosure, toastMessage) {
     console.error(error);
     push(
-      <Detail markdown={error.message}
+      <Detail
+        markdown={error.message}
         // action for retry
         actions={
           <ActionPanel>
             <Action
               title="Retry"
               icon={Icon.Reply}
-              onAction={
-                () => {
-                  pop();
-                  retryClosure();
-                }
-              } />
-          </ActionPanel>}
-      />);
+              onAction={() => {
+                pop();
+                retryClosure();
+              }}
+            />
+          </ActionPanel>
+        }
+      />,
+    );
     await showToast({
       style: Toast.Style.Failure,
       title: toastMessage,
@@ -179,7 +184,7 @@ export function useChat(props) {
           href: fileUrl,
           title: "image",
           content: imagePart,
-        })
+        });
         console.log(fileUrl);
         const imageTemplate = `👤: \n\n\`\`\`\n${displayQuery || query}\n\`\`\` \n\n ![image](${fileUrl}) \n\n 🤖: \n\n`;
         historyText = imageTemplate;
@@ -236,8 +241,9 @@ export function useChat(props) {
         var calls = result.response.functionCalls();
         while (calls && calls.length > 0 && calls[0]) {
           const call = calls[0];
-          setMarkdown(historyText +
-            `calling \`${call.name}\` with args:\n \`\`\`js\n${JSON.stringify(call.args)}\n\`\`\`\n`);
+          setMarkdown(
+            historyText + `calling \`${call.name}\` with args:\n \`\`\`js\n${JSON.stringify(call.args)}\n\`\`\`\n`,
+          );
           const apiResponse = await apiFunctions[call.name](call.args);
           if (call.name == "google") setMetadata(apiResponse);
           // Indicating
@@ -287,7 +293,7 @@ export function useChat(props) {
         e,
         () => getResponse(query, enable_vision, retrievalType, displayQuery),
         "No response from Gemini",
-      )
+      );
     }
   };
 

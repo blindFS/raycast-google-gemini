@@ -151,6 +151,9 @@ export const retrievalTypes = {
 };
 
 export async function GoogleSearch(searchQuery, searchApiKey = "", searchEngineID = "", topN = 10) {
+  if (searchApiKey == "") {
+    throw new Error("You have to provide Google search API and search engine ID to use this feature.");
+  }
   const googleSearchUrl = "https://www.googleapis.com/customsearch/v1?";
   const params = {
     key: searchApiKey,

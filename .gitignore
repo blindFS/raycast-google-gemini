@@ -2,9 +2,12 @@
 
 # dependencies
 /node_modules
+assets/markdownMath/node_modules
 
 # Raycast specific files
 raycast-env.d.ts
 
 # misc
+.vscode
 .DS_Store
+package-lock.json
