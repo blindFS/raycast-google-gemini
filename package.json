@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "raycast-google-gemini",
-  "title": "Google Gemini",
+  "name": "raycast-google-gemini-chatbot",
+  "title": "Google Gemini Chatbot",
   "description": "Use the Google Gemini API in Raycast.",
   "icon": "command-icon.png",
   "author": "blindfs",
@@ -324,6 +324,6 @@
     "fix-lint": "ray lint --fix",
     "lint": "ray lint",
     "publish": "npx @raycast/api@latest publish",
-    "postinstall": "npm --prefix assets/markdownMath install && sed -i '' 's/response.body.pipeThrough.*$/ReadableStream.from(response.body);/g' ./node_modules/@google/generative-ai/dist/index.mjs"
+    "postinstall": "npm --prefix assets/markdown-math install && sed -i '' 's/response.body.pipeThrough.*$/ReadableStream.from(response.body);/g' ./node_modules/@google/generative-ai/dist/index.mjs"
   }
 }

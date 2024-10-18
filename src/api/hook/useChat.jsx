@@ -276,7 +276,7 @@ export function useChat(props) {
         fs.writeFileSync(DOWNLOAD_PATH, text);
         console.log("New response saved to " + DOWNLOAD_PATH);
         // replace equations with images
-        const scriptPath = resolve(environment.assetsPath, "markdownMath", "index.js");
+        const scriptPath = resolve(environment.assetsPath, "markdown-math", "index.js");
         const newMarkdown = executeShellCommand(`node ${scriptPath} "${DOWNLOAD_PATH}"`);
         setMarkdown(historyText + newMarkdown);
       }
