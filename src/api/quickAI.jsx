@@ -38,7 +38,7 @@ export default (props, context, vision = false, retrievalType = retrievalTypes.N
             getFullQuery(query, context, examples),
             vision,
             retrievalType,
-            examples && getFullQuery(query, context, ""),
+            query,
           );
         }
       } catch (e) {

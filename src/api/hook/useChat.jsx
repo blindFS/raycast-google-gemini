@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
+import { DynamicRetrievalMode, GoogleGenerativeAI, HarmBlockThreshold, HarmCategory } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
 import {
   Action,
@@ -22,17 +22,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   executeShellCommand,
   getRetrieval,
-  GoogleSearch,
   pathOrURLToImage,
-  rawHTMLByURL,
   retrievalTypes,
 } from "../utils";
 
 const {
   apiKey,
   defaultModel,
-  searchApiKey,
-  searchEngineID,
   enableMathjax,
   enableCodeExecution,
   temperature,
@@ -48,62 +44,15 @@ for (const category of Object.keys(HarmCategory)) {
   }
 }
 const generationConfig = {
-  maxOutputTokens: 50000,
+  maxOutputTokens: 8192,
   temperature: 0.0,
   topP: 0.01,
   topK: 1,
 };
 
-const googleSearchFunctionDeclaration = {
-  name: "google",
-  parameters: {
-    type: "OBJECT",
-    description: "Set the query and how many docs to return.",
-    properties: {
-      query: {
-        type: "STRING",
-        description: "The query to search google for.",
-      },
-      topN: {
-        type: "NUMBER",
-        description: "Return top N related documents.",
-      },
-    },
-    required: ["query"],
-  },
-};
-
-const getFullContextFunctionDeclaration = {
-  name: "getFullContext",
-  parameters: {
-    type: "OBJECT",
-    description: "Set the url of the online document that you want to retrieve.",
-    properties: {
-      url: {
-        type: "STRING",
-        description: "The url of the online document that you want to retrieve.",
-      },
-    },
-    required: ["url"],
-  },
-};
-
-// Executable function code. Put it in a map keyed by the function name
-// so that you can call it once you get the name string from the model.
-const apiFunctions = {
-  google: async ({ query, topN = 5 }) => {
-    return await GoogleSearch(query, searchApiKey, searchEngineID, topN);
-  },
-  getFullContext: async ({ url }) => {
-    return [await rawHTMLByURL(url)];
-  },
-};
-
 export function useChat(props) {
   const { query: argQuery } = props.arguments;
-  var { searchQuery: argGoogle } = props.arguments;
   var { docLink: argURL } = props.arguments;
-  argGoogle = argGoogle || argQuery;
   argURL = argURL || "";
   const context = props.launchContext || {};
   generationConfig.temperature = parseFloat(temperature);
@@ -170,10 +119,7 @@ export function useChat(props) {
       if ([retrievalTypes.Google, retrievalTypes.URL].includes(retrievalType) && metadata.length == 0) {
         retrievalObjects = await getRetrieval(
           fileManager,
-          argGoogle,
           retrievalType,
-          searchApiKey,
-          searchEngineID,
           argURL,
         );
       }
@@ -200,20 +146,27 @@ export function useChat(props) {
         title: "Waiting for Gemini...",
       });
 
-      // TODO: for now, not allowed to enable function call & code execution at the same time
-      // disable codeExecution if function call is enabled historically
-      var tools = enableCodeExecution ? { codeExecution: {} } : {};
-      if (retrievalType == retrievalTypes.Function || (historyJson.length > 0 && metadata.length > 0)) {
-        tools = {
-          functionDeclarations: [googleSearchFunctionDeclaration, getFullContextFunctionDeclaration],
-        };
+      var tools = [
+        {
+          googleSearchRetrieval: {
+            dynamicRetrievalConfig: {
+              mode: DynamicRetrievalMode.MODE_DYNAMIC,
+              dynamicThreshold: 0.7,
+            },
+          },
+        }
+      ];
+      if (enableCodeExecution) {
+        tools.push({ codeExecution: {} });
       }
-      const model = genAI.getGenerativeModel({
-        model: defaultModel,
-        generationConfig: generationConfig,
-        safetySettings: safetySettings,
-        tools: [tools],
-      });
+      const model = genAI.getGenerativeModel(
+        {
+          model: defaultModel,
+          generationConfig: generationConfig,
+          safetySettings: safetySettings,
+          tools: tools,
+        },
+      );
       const chat = model.startChat({
         history: historyJson,
       });

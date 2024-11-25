@@ -147,59 +147,17 @@ export const retrievalTypes = {
   None: 0,
   URL: 1,
   Google: 2,
-  Function: 3,
 };
-
-export async function GoogleSearch(searchQuery, searchApiKey = "", searchEngineID = "", topN = 10) {
-  if (searchApiKey == "") {
-    throw new Error("You have to provide Google search API and search engine ID to use this feature.");
-  }
-  const googleSearchUrl = "https://www.googleapis.com/customsearch/v1?";
-  const params = {
-    key: searchApiKey,
-    cx: searchEngineID,
-    q: searchQuery,
-  };
-  const controller = new AbortController();
-  setTimeout(() => {
-    controller.abort();
-  }, 5000);
-  const json = await requestWithToast(
-    async () => {
-      const response = await fetch(googleSearchUrl + new URLSearchParams(params), { signal: controller.signal });
-      return await response.json();
-    },
-    "query: " + searchQuery,
-    "Google Searching",
-    "Got google top results",
-  );
-  if (!json || !json.items) {
-    return [];
-  }
-  return json.items.slice(0, topN).map((item) => {
-    return {
-      href: item.link,
-      title: item.title,
-      content: item.snippet,
-    };
-  });
-}
 
 export async function getRetrieval(
   fileManager,
-  searchQuery,
   retrievalType,
-  searchApiKey = "",
-  searchEngineID = "",
   URL = "",
-  topN = 10,
 ) {
   var retrievalObjects = [];
   if (retrievalType == retrievalTypes.URL) {
     const retrievalObject = await retrieveByUrl(fileManager, URL);
     if (retrievalObject) retrievalObjects.push(retrievalObject);
-  } else if (retrievalType == retrievalTypes.Google) {
-    retrievalObjects = await GoogleSearch(searchQuery, searchApiKey, searchEngineID, topN);
   }
   return retrievalObjects;
 }

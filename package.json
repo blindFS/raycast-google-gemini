@@ -5,8 +5,7 @@
   "description": "Use the Google Gemini API in Raycast.",
   "icon": "command-icon.png",
   "author": "blindfs",
-  "contributors": [
-  ],
+  "contributors": [],
   "categories": [
     "Productivity",
     "Developer Tools"
@@ -131,42 +130,6 @@
       ]
     },
     {
-      "name": "search-qa",
-      "title": "Search QA",
-      "subtitle": "Google Gemini",
-      "description": "Answer question based on Google search results",
-      "mode": "view",
-      "arguments": [
-        {
-          "name": "query",
-          "placeholder": "Query",
-          "type": "text",
-          "required": true
-        },
-        {
-          "name": "searchQuery",
-          "placeholder": "Query to Google",
-          "type": "text",
-          "required": false
-        }
-      ]
-    },
-    {
-      "name": "iterative-rag",
-      "title": "Iterative RAG",
-      "subtitle": "Google Gemini",
-      "description": "Answer questions based on multiple rounds of Google search and document reading",
-      "mode": "view",
-      "arguments": [
-        {
-          "name": "query",
-          "placeholder": "Query",
-          "type": "text",
-          "required": false
-        }
-      ]
-    },
-    {
       "name": "history",
       "title": "Search Chat History",
       "subtitle": "Google Gemini",
@@ -244,20 +207,6 @@
           "value": "gemini-1.5-flash"
         }
       ]
-    },
-    {
-      "description": "Search API Key",
-      "name": "searchApiKey",
-      "required": false,
-      "title": "Google Search API Key",
-      "type": "password"
-    },
-    {
-      "description": "Search Engine ID",
-      "name": "searchEngineID",
-      "required": false,
-      "title": "Google Programmable Search Engine ID",
-      "type": "textfield"
     },
     {
       "description": "Whether to use mathjax-node to post-render math equations, node executable required in PATH.",
