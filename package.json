@@ -233,7 +233,7 @@
       "title": "Model",
       "type": "dropdown",
       "required": false,
-      "default": "gemini-1.5-flash",
+      "default": "gemini-2.0-flash-exp",
       "data": [
         {
           "title": "Gemini 1.5 Pro",
@@ -242,6 +242,10 @@
         {
           "title": "Gemini 1.5 Flash",
           "value": "gemini-1.5-flash"
+        },
+        {
+          "title": "Gemini 2.0 Flash",
+          "value": "gemini-2.0-flash-exp"
         }
       ]
     },
