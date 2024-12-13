@@ -48,7 +48,7 @@ for (const category of Object.keys(HarmCategory)) {
   }
 }
 const generationConfig = {
-  maxOutputTokens: 50000,
+  maxOutputTokens: 8192,
   temperature: 0.0,
   topP: 0.01,
   topK: 1,
