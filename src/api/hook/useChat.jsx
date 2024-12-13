@@ -147,14 +147,14 @@ export function useChat(props) {
       });
 
       var tools = [
-        {
-          googleSearchRetrieval: {
-            dynamicRetrievalConfig: {
-              mode: DynamicRetrievalMode.MODE_DYNAMIC,
-              dynamicThreshold: 0.7,
-            },
-          },
-        }
+        // {
+        //   googleSearchRetrieval: {
+        //     dynamicRetrievalConfig: {
+        //       mode: DynamicRetrievalMode.MODE_DYNAMIC,
+        //       dynamicThreshold: 0.7,
+        //     },
+        //   },
+        // }
       ];
       if (enableCodeExecution) {
         tools.push({ codeExecution: {} });
